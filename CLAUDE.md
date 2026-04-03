@@ -224,13 +224,12 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 abstract class BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0
+    val id: String = UlidCreator.getUlid().toString()  // ULID 자동 생성
 
     val createdAt: LocalDateTime = LocalDateTime.now()
     var updatedAt: LocalDateTime = LocalDateTime.now()
 
-    @Transient
+    @Transient  // DB 컬럼 아님 — 변경 전 값 보관용
     var snapshot: String? = null
         private set
 
@@ -240,6 +239,9 @@ abstract class BaseEntity {
     }
 }
 ```
+
+> ULID는 서버에서 생성하므로 `@GeneratedValue` 불필요.
+> DB에 INSERT 전 애플리케이션 레이어에서 ID가 확정됨.
 
 ---
 
@@ -331,12 +333,17 @@ data class ServerJwtClaims(
 
 ```kotlin
 data class ShadowClaims(
-    val userId: String,
-    val role: Role,
-    val operatorId: String,
-    val isShadow: Boolean = true
+    val userId: String,          // 대상 마케터 ID (ULID)
+    val role: Role,              // 대상 마케터 역할
+    val operatorId: String,      // 발급한 운영자 ID (ULID)
+    val isShadow: Boolean = true,
+    val targetName: String,      // 대상 마케터 이름 (배너 표시용)
+    val targetWorkEmail: String? = null  // 업무용 이메일 (등록된 경우에만, 소셜 이메일 사용 금지)
 )
 ```
+
+> 소셜 이메일은 개인정보이므로 Shadow JWT에 포함하지 않음.
+> 대상 계정 식별은 이름 + 업무용 이메일 (없으면 이름만) 조합으로 표시.
 
 - 유효기간: 30분
 - 서명 키: AWS Secrets Manager (`aoc-se-secret-shadow-jwt-key`)
@@ -370,11 +377,11 @@ object ActorContext {
 ```sql
 -- 회원
 CREATE TABLE member (
-    id          BIGSERIAL PRIMARY KEY,
+    id          VARCHAR(26)  PRIMARY KEY,              -- ULID (외부 노출 금지)
     email       VARCHAR(255) NOT NULL UNIQUE,
     name        VARCHAR(100) NOT NULL,
-    provider    VARCHAR(50)  NOT NULL,  -- GOOGLE, META, APPLE
-    provider_id VARCHAR(255) NOT NULL,  -- 소셜 고유 식별자
+    provider    VARCHAR(50)  NOT NULL,                 -- GOOGLE, META, APPLE
+    provider_id VARCHAR(255) NOT NULL,                 -- 소셜 외부 식별자 (내부 저장만, 노출 금지)
     work_email  VARCHAR(255),
     role        VARCHAR(50)  NOT NULL DEFAULT 'MARKETER'
                     CHECK (role IN ('MARKETER', 'AGENCY_MANAGER', 'OPERATOR')),
@@ -386,24 +393,24 @@ CREATE TABLE member (
 
 -- 알림 설정
 CREATE TABLE notification_setting (
-    id              BIGSERIAL PRIMARY KEY,
-    member_id       BIGINT    NOT NULL UNIQUE REFERENCES member(id),
-    inquiry_alert   BOOLEAN   NOT NULL DEFAULT true,
-    marketing_alert BOOLEAN   NOT NULL DEFAULT false,
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    id              VARCHAR(26)  PRIMARY KEY,          -- ULID
+    member_id       VARCHAR(26)  NOT NULL UNIQUE REFERENCES member(id),
+    inquiry_alert   BOOLEAN      NOT NULL DEFAULT true,
+    marketing_alert BOOLEAN      NOT NULL DEFAULT false,
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- 변경 이력
 CREATE TABLE history (
-    id           BIGSERIAL PRIMARY KEY,
+    id           VARCHAR(26)  PRIMARY KEY,             -- ULID
     entity_type  VARCHAR(100) NOT NULL,
-    entity_id    BIGINT       NOT NULL,
-    action       VARCHAR(20)  NOT NULL,  -- CREATE, UPDATE, DELETE
+    entity_id    VARCHAR(26)  NOT NULL,                -- 대상 엔티티 ULID
+    action       VARCHAR(20)  NOT NULL,                -- CREATE, UPDATE, DELETE, SHADOW_LOGIN 등
     before_value JSONB,
     after_value  JSONB,
-    actor_id     BIGINT       NOT NULL,
-    operator_id  BIGINT,
+    actor_id     VARCHAR(26)  NOT NULL,                -- 실제 행위자 ULID
+    operator_id  VARCHAR(26),                          -- 쉐도우 세션 시 운영자 ULID
     is_shadow    BOOLEAN      NOT NULL DEFAULT false,
     created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -411,6 +418,25 @@ CREATE TABLE history (
 CREATE INDEX idx_history_actor   ON history(actor_id);
 CREATE INDEX idx_history_entity  ON history(entity_type, entity_id);
 CREATE INDEX idx_history_created ON history(created_at);
+```
+
+**ID 전략**
+```
+내부 PK        → ULID (VARCHAR 26) — 추측 불가, 시간순 정렬 가능
+               절대 외부(API 응답, UI)에 노출하지 않음
+소셜 provider_id → 내부 저장 전용 (동일 계정 재가입 감지용)
+               절대 외부 노출하지 않음
+사용자 식별 표시 → 이름 + 이메일 조합
+               예: 홍길동 (hong@gmail.com)
+```
+
+ULID 생성 라이브러리:
+```kotlin
+// build.gradle.kts
+implementation("com.github.f4b6a3:ulid-creator:5.2.0")
+
+// 사용
+val id = UlidCreator.getUlid().toString()
 ```
 
 PostgreSQL은 MySQL과 다르게 대소문자를 구분함.
@@ -428,7 +454,7 @@ enum class MemberStatus { ACTIVE, DELETED }
 
 @Entity
 class Member : BaseEntity() {
-    @Enumerated(EnumType.STRING)  // DB에 문자열로 저장 (ORDINAL 사용 금지 — 순서 변경 시 데이터 오염)
+    @Enumerated(EnumType.STRING)  // DB에 문자열로 저장 (ORDINAL 사용 금지)
     var role: Role = Role.MARKETER
 
     @Enumerated(EnumType.STRING)
