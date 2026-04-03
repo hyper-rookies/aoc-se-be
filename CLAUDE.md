@@ -304,6 +304,38 @@ data class ApiResponse<T>(
 
 ---
 
+## Dockerfile
+
+베이스 이미지: `eclipse-temurin:17-jre-jammy` (Ubuntu 22.04 기반 JDK 17)
+
+```dockerfile
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /app
+COPY build/libs/*.jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+빌드 후 이미지 생성:
+```powershell
+# 먼저 jar 빌드
+.\gradlew.bat bootJar
+
+# Docker 이미지 빌드
+docker build -t aoc-se-ecr-chat .
+```
+
+> `build.gradle.kts`에서 jar 파일명이 여러 개 생성될 수 있음.  
+> `bootJar` 태스크로 실행 가능한 jar 하나만 생성되도록 설정 권장.
+
+```kotlin
+// build.gradle.kts
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    archiveFileName.set("app.jar")
+}
+```
+
+---
+
 ## 주의사항
 
 - Kotlin에서 JPA Entity는 `open class` 또는 allOpen 플러그인 필요
