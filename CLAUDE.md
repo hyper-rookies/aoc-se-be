@@ -72,7 +72,7 @@ aoc-se-be/
 │       │   │   ├── MemberController.kt
 │       │   │   └── dto/
 │       │   └── infra/
-│       │       └── CognitoClient.kt
+│       │       └── CognitoClient.kt        # Cognito 토큰 검증, 콜백 처리
 │       ├── auth/
 │       │   ├── JwtProvider.kt
 │       │   ├── ShadowJwtProvider.kt
@@ -409,4 +409,8 @@ data class ApiResponse<T>(
 - `data class`를 JPA Entity로 쓰면 equals/hashCode 문제 발생 → 일반 `class` 사용
 - `build.gradle.kts`에 `kotlin("plugin.jpa")`와 `kotlin("plugin.spring")` 플러그인 추가 필요
 - `application-prod.yml`은 절대 git에 올리지 않을 것
+- Cognito 콜백 처리 (가입 완료 후 DB 저장)는 Lambda 없이 ECS에서 직접 처리
+  → `/auth/callback` API 엔드포인트에서 member 저장
+- Shadow JWT는 Cognito 미사용, ECS가 Secrets Manager 서명 키로 직접 발급/검증
+- Shadow JWT 활성 세션은 Redis에서 관리, 일반 Refresh Token도 Redis에 저장
 - 연관 레포: `aoc-se-fe` (프론트엔드), `aoc-se-infra` (인프라)
