@@ -18,6 +18,7 @@
 - **인증**: AWS Cognito (OAuth 2.0)
 - **빌드**: Gradle (Kotlin DSL)
 - **배포**: AWS ECS Fargate (eclipse-temurin:17-jre-jammy / Ubuntu 22.04)
+- **이메일**: AWS SES (업무용 이메일 인증 코드 발송)
 
 ---
 
@@ -71,6 +72,8 @@ aoc-se-be/
 │       │   ├── presentation/
 │       │   │   ├── MemberController.kt
 │       │   │   └── dto/
+│       ├── auth/
+│       │   ├── AuthController.kt           # /auth/callback 엔드포인트
 │       │   └── infra/
 │       │       └── CognitoClient.kt        # Cognito 토큰 검증, 콜백 처리
 │       ├── auth/
@@ -260,6 +263,39 @@ save() 호출
 
 ---
 
+## 로그인 흐름 및 서버 JWT
+
+Cognito JWT에는 `role` 클레임이 없음. 로그인 완료 후 서버가 role 포함한 자체 JWT를 재발급함.
+
+```
+1. 클라이언트 → Cognito          소셜 로그인 (OAuth)
+2. Cognito → 클라이언트          Cognito JWT 발급 (role 없음)
+3. 클라이언트 → /auth/callback   Cognito JWT 전달
+4. 서버                          Cognito JWT 검증
+                                 DB에서 멤버 조회 (없으면 신규 생성 + MARKETER 역할 부여)
+                                 role 포함한 서버 자체 JWT 발급
+5. 서버 → 클라이언트             서버 JWT 반환 (role, userId 포함)
+6. 클라이언트                    이후 모든 API 호출에 서버 JWT 사용
+                                 Cognito JWT는 버림
+```
+
+서버 JWT 클레임 구조:
+```kotlin
+data class ServerJwtClaims(
+    val userId: String,
+    val role: Role,
+    val isShadow: Boolean = false  // 일반 로그인은 false
+)
+```
+
+일반 JWT와 Shadow JWT 구조 통일:
+```
+일반 로그인  → 서버 JWT (isShadow = false, Cognito가 인증 보증)
+쉐도우 로그인 → Shadow JWT (isShadow = true, 서버가 직접 발급)
+```
+
+---
+
 ## Shadow JWT
 
 쉐도우 로그인은 Cognito 토큰이 아닌 서버 자체 발급 JWT 사용.
@@ -385,12 +421,65 @@ data class ApiResponse<T>(
 
 ---
 
+## CORS 설정
+
+프론트(CloudFront 도메인)와 백엔드(ALB 도메인)가 다른 도메인이므로 CORS 설정 필수.
+
+```kotlin
+@Configuration
+class CorsConfig {
+    @Bean
+    fun corsFilter(): CorsFilter {
+        val config = CorsConfiguration()
+        config.allowedOrigins = listOf(
+            "http://localhost:5173",           // 로컬 개발
+            "https://{cloudfront_domain}"      // 배포 환경 (환경변수로 주입)
+        )
+        config.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
+        config.allowedHeaders = listOf("*")
+        config.allowCredentials = true
+
+        val source = UrlBasedCorsConfigurationSource()
+        source.registerCorsConfiguration("/api/**", config)
+        return CorsFilter(source)
+    }
+}
+```
+
+> CloudFront 도메인은 환경변수(`ALLOWED_ORIGINS`)로 주입받아 사용할 것.
+
+---
+
 ## 권한 어노테이션
 
 ```kotlin
 @PreAuthorize("hasRole('OPERATOR')")
 @PreAuthorize("hasRole('MARKETER')")
 @PreAuthorize("hasRole('MARKETER') and !@actorContext.isShadow()")
+```
+
+---
+
+## 업무용 이메일 인증 (AWS SES)
+
+```
+인증 코드 발송 흐름
+1. 업무용 이메일 등록 요청
+2. Redis에 인증 코드 저장 (TTL 5분, 하루 5회 제한 카운터)
+3. AWS SES로 인증 코드 이메일 발송
+4. 사용자가 코드 입력 → Redis에서 검증
+5. 검증 성공 시 DB에 업무용 이메일 저장
+```
+
+SES 샌드박스 모드 주의:
+```
+샌드박스 모드 (기본)
+  → 인증된 이메일 주소로만 발송 가능
+  → 테스트 시 SES에서 이메일 주소 사전 인증 필요
+
+프로덕션 모드 전환
+  → AWS 콘솔에서 SES 프로덕션 접근 요청 필요
+  → 이 과제에서는 샌드박스로 진행, 본인 이메일만 테스트
 ```
 
 ---
