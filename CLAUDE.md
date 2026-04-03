@@ -72,11 +72,10 @@ aoc-se-be/
 │       │   ├── presentation/
 │       │   │   ├── MemberController.kt
 │       │   │   └── dto/
-│       ├── auth/
-│       │   ├── AuthController.kt           # /auth/callback 엔드포인트
 │       │   └── infra/
 │       │       └── CognitoClient.kt        # Cognito 토큰 검증, 콜백 처리
 │       ├── auth/
+│       │   ├── AuthController.kt           # /auth/callback, 로그인/로그아웃
 │       │   ├── JwtProvider.kt
 │       │   ├── ShadowJwtProvider.kt
 │       │   └── ActorContext.kt
@@ -248,8 +247,9 @@ abstract class BaseEntity {
 
 비즈니스 코드에 히스토리 저장 코드를 작성하지 않아도 자동으로 기록됨.
 
+### 엔티티 변경 이력 (자동)
 ```
-save() 호출
+save() / update() 호출
     → EntityListener (@PrePersist / @PreUpdate / @PreRemove)
     → 이벤트 발행 (ApplicationEventPublisher)
     → 원본 트랜잭션 커밋
@@ -257,9 +257,38 @@ save() 호출
     → 별도 트랜잭션(REQUIRES_NEW)으로 history 테이블 저장
 ```
 
+UPDATE 시 before/after 모두 기록:
+```
+@PreUpdate
+  → entity.snapshot (변경 전, @PostLoad 시점에 저장)  → before_value
+  → JsonUtils.toJson(entity) (변경 후)                → after_value
+```
+
+### 쉐도우 감사 로그 (별도 기록)
+엔티티 변경 이력과 별도로 아래 행위도 history 테이블에 기록:
+
+| 행위 | action 값 | 비고 |
+|---|---|---|
+| 쉐도우 로그인 시작 | `SHADOW_LOGIN` | operatorId, targetMemberId 기록 |
+| 쉐도우 로그아웃 | `SHADOW_LOGOUT` | 세션 종료 시각 기록 |
+| 쉐도우 세션 만료 | `SHADOW_EXPIRED` | 30분 만료 시 기록 |
+
+```kotlin
+// 쉐도우 로그인 시작 시 직접 기록 (AOP @ShadowAudit)
+historyRepository.save(History(
+    entityType = "ShadowSession",
+    entityId   = targetMemberId,
+    action     = "SHADOW_LOGIN",
+    actorId    = operatorId,
+    operatorId = operatorId,
+    isShadow   = true
+))
+```
+
 핵심 원칙:
 - 히스토리 저장 실패가 원본 트랜잭션에 영향 없어야 함
 - `HistoryRepository.save()`를 서비스에서 직접 호출하지 않음
+- 단, 쉐도우 로그인 시작/종료는 엔티티 변경이 아니므로 AOP에서 직접 기록
 
 ---
 
