@@ -226,7 +226,7 @@ CREATE TABLE member (
     id          BIGSERIAL PRIMARY KEY,
     email       VARCHAR(255) NOT NULL UNIQUE,
     name        VARCHAR(100) NOT NULL,
-    provider    VARCHAR(50)  NOT NULL,  -- GOOGLE, KAKAO, NAVER 등
+    provider    VARCHAR(50)  NOT NULL,  -- GOOGLE, META, APPLE 등
     provider_id VARCHAR(255) NOT NULL,  -- 소셜 고유 식별자
     work_email  VARCHAR(255),
     role        VARCHAR(50)  NOT NULL DEFAULT 'MARKETER',
