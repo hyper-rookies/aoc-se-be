@@ -481,11 +481,33 @@ class CorsConfig {
 
 ## 권한 어노테이션
 
+UI 숨김만으로 보안 처리 완결되지 않음. API 레벨에서도 반드시 동일하게 제어.
+
 ```kotlin
+// 운영자만 접근
 @PreAuthorize("hasRole('OPERATOR')")
+
+// 마케터만 접근
 @PreAuthorize("hasRole('MARKETER')")
+
+// 쉐도우 세션 제외 — 직접 로그인한 경우에만 허용
 @PreAuthorize("hasRole('MARKETER') and !@actorContext.isShadow()")
 ```
+
+### API별 권한 매핑
+
+| API | 어노테이션 | 이유 |
+|---|---|---|
+| `PUT /members/me` (내 정보 수정) | `!@actorContext.isShadow()` | 쉐도우 세션 중 대상 마케터 정보 수정 방지 |
+| `PUT /members/me/work-email` (업무 이메일 수정) | `!@actorContext.isShadow()` | 동일 |
+| `DELETE /members/me` (회원 탈퇴) | `hasRole('MARKETER') and !@actorContext.isShadow()` | 쉐도우 세션 중 탈퇴 방지 |
+| `PUT /notification-settings` (알림 설정) | `hasRole('MARKETER') and !@actorContext.isShadow()` | 쉐도우 세션 중 알림 설정 변경 방지 |
+| `PUT /members/{id}/role` (역할 변경) | `hasRole('OPERATOR')` | 운영자만 가능 |
+| `GET /histories` (변경 이력 조회) | `hasRole('OPERATOR')` | 운영자만 가능 |
+| `POST /shadow-login` (쉐도우 로그인) | `hasRole('OPERATOR')` | 운영자만 가능 |
+
+> UI에서 메뉴를 숨겨도 API를 직접 호출하면 접근 가능하므로
+> 서버에서 반드시 위 어노테이션으로 이중 방어할 것.
 
 ---
 
