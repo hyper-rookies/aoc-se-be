@@ -484,6 +484,50 @@ SES 샌드박스 모드 주의:
 
 ---
 
+## 역할 변경 보안 처리
+
+### 본인 역할 변경 불가
+```kotlin
+fun changeRole(currentUser: AuthUser, targetMemberId: Long, newRole: Role) {
+    // 본인 역할 변경 불가
+    if (currentUser.userId == targetMemberId.toString()) {
+        throw IllegalArgumentException("본인의 역할은 변경할 수 없습니다")
+    }
+    // 역할 변경 로직
+}
+```
+
+### Access Token 블랙리스트
+역할 변경 즉시 기존 Access Token 무효화 필요.
+Refresh Token만 삭제하면 Access Token이 만료(1시간)될 때까지 기존 role로 인식됨.
+
+```kotlin
+// 역할 변경 시 Access Token 블랙리스트 등록
+fun blacklistAccessToken(jti: String, remainingTtl: Duration) {
+    redisTemplate.opsForValue().set(
+        "blacklist:$jti",
+        "1",
+        remainingTtl
+    )
+}
+
+// Security Filter에서 매 요청마다 블랙리스트 체크
+val isBlacklisted = redisTemplate.hasKey("blacklist:$jti")
+if (isBlacklisted == true) throw UnauthorizedException("토큰이 무효화되었습니다")
+```
+
+JWT에 `jti` (JWT ID) 클레임 포함 필수:
+```kotlin
+data class ServerJwtClaims(
+    val userId: String,
+    val role: Role,
+    val isShadow: Boolean = false,
+    val jti: String = UUID.randomUUID().toString()  // 블랙리스트 키로 사용
+)
+```
+
+---
+
 ## 로컬 실행
 
 ```powershell
