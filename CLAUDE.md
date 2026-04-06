@@ -11,14 +11,15 @@
 ## 기술 스택
 
 - **언어**: Kotlin
-- **프레임워크**: Spring Boot 3.x
+- **프레임워크**: Spring Boot 3.2.5
 - **ORM**: Spring Data JPA + Hibernate
 - **DB**: PostgreSQL 15
 - **세션**: Redis 7
-- **인증**: AWS Cognito (OAuth 2.0)
+- **인증**: AWS Cognito (OAuth 2.0), JJWT 0.12.x, Nimbus JOSE JWT 9.37.3
 - **빌드**: Gradle (Kotlin DSL)
 - **배포**: AWS ECS Fargate (eclipse-temurin:17-jre-jammy / Ubuntu 22.04)
 - **이메일**: AWS SES (업무용 이메일 인증 코드 발송)
+- **API 문서**: SpringDoc OpenAPI 2.5.0 (Swagger UI)
 
 ---
 
@@ -58,77 +59,76 @@ when (role) {
 
 ```
 aoc-se-be/
-├── .github/
-│   └── workflows/
-│       └── be-ci.yml               # CI/CD 파이프라인
-├── src/main/kotlin/
-│   └── com/aoc/
-│       ├── member/
-│       │   ├── domain/
-│       │   │   ├── Member.kt
-│       │   │   └── MemberRepository.kt
-│       │   ├── application/
-│       │   │   └── MemberService.kt
-│       │   ├── presentation/
-│       │   │   ├── MemberController.kt
-│       │   │   └── dto/
-│       │   └── infra/
-│       │       └── CognitoClient.kt        # Cognito 토큰 검증, 콜백 처리
-│       ├── auth/
-│       │   ├── AuthController.kt           # /auth/callback, 로그인/로그아웃
-│       │   ├── JwtProvider.kt
-│       │   ├── ShadowJwtProvider.kt
-│       │   └── ActorContext.kt
-│       ├── history/
-│       │   ├── HistoryEntityListener.kt
-│       │   ├── HistoryEventHandler.kt
-│       │   └── History.kt
-│       ├── notification/
-│       │   └── NotificationSetting.kt
-│       ├── common/
-│       │   ├── BaseEntity.kt
-│       │   └── SpringApplicationContext.kt
-│       └── config/
-│           ├── SecurityConfig.kt
-│           └── JpaConfig.kt
+├── src/main/kotlin/com/aoc/
+│   ├── AocSeApplication.kt
+│   ├── member/
+│   │   ├── domain/
+│   │   │   ├── Member.kt                   ✅ Role, MemberStatus enum 포함
+│   │   │   └── MemberRepository.kt         ✅
+│   │   ├── application/
+│   │   │   └── MemberService.kt            ✅ loginOrRegister()
+│   │   ├── presentation/
+│   │   │   ├── MemberController.kt         (미구현)
+│   │   │   └── dto/
+│   │   └── infra/
+│   │       └── CognitoClient.kt            ✅ JWKS 기반 검증
+│   ├── auth/
+│   │   ├── AuthController.kt               ✅ POST /auth/callback
+│   │   ├── JwtProvider.kt                  ✅ HS256, jti 포함
+│   │   ├── JwtAuthenticationFilter.kt      ✅ Bearer 추출 → 검증 → 블랙리스트
+│   │   ├── ActorContext.kt                 ✅ ThreadLocal, @Component("actorContext")
+│   │   ├── CognitoJwtException.kt          ✅
+│   │   └── ShadowJwtProvider.kt            TODO (Day 3)
+│   ├── history/
+│   │   ├── History.kt                      (골격만)
+│   │   ├── HistoryEntityListener.kt        (stub — Day 4)
+│   │   └── HistoryEventHandler.kt          (미구현 — Day 4)
+│   ├── notification/
+│   │   ├── NotificationSetting.kt          ✅
+│   │   └── NotificationSettingRepository.kt ✅
+│   ├── common/
+│   │   ├── BaseEntity.kt                   ✅ ULID, snapshot
+│   │   ├── ApiResponse.kt                  ✅ ok/error 팩토리, code 필드
+│   │   ├── ErrorCode.kt                    ✅ ErrorCode enum
+│   │   ├── BusinessException.kt            ✅ + 하위 예외 클래스
+│   │   ├── GlobalExceptionHandler.kt       ✅ MethodArgumentNotValidException 포함
+│   │   └── SpringApplicationContext.kt     (비어있음 — Day 4에 채울 예정)
+│   └── config/
+│       ├── SecurityConfig.kt               ✅ STATELESS, CSRF off, JwtFilter 등록
+│       ├── CorsConfig.kt                   ✅ 로컬 5173 + CloudFront
+│       ├── JpaConfig.kt                    ✅ @EnableJpaAuditing
+│       ├── RedisConfig.kt                  ✅ StringRedisSerializer
+│       └── SwaggerConfig.kt                ✅ bearerAuth 스킴 등록
 ├── src/main/resources/
-│   ├── application.yml              # 로컬 개발용 (git 포함)
-│   ├── application-prod.yml         # 배포용 (git 제외)
-│   └── application-prod.yml.example # 형식 공유용 (git 포함)
+│   ├── application.yml                     공통 설정 (profiles.active=local)
+│   ├── application-local.yml               로컬 개발용 (git 제외)
+│   ├── application-prod.yml                배포용 환경변수 참조 (git 제외)
+│   └── application-prod.yml.example        환경변수 키 목록 문서화 (git 포함)
 ├── build.gradle.kts
 ├── Dockerfile
 ├── CLAUDE.md
+├── CONVENTION.md
 └── README.md
 ```
+
+---
+
+## 코딩 컨벤션
+
+→ `CONVENTION.md` 참고
 
 ---
 
 ## 환경변수 관리
 
 ### 로컬 개발
-```yaml
-# application.yml (git 포함)
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/aoc
-    username: aoc
-    password: aoc1234
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-  data:
-    redis:
-      host: localhost
-      port: 6379
-```
+`application-local.yml`에 하드코딩 (git 제외).  
+서버 실행 시 `spring.profiles.active=local`이 자동 적용됨.
 
 ### 배포 환경
+ECS 태스크 정의에서 AWS Secrets Manager / Parameter Store → 환경변수로 주입.  
+Spring은 `application-prod.yml`의 `${ENV_VAR}` 형태로 읽음.
+
 ```
 민감 정보 → AWS Secrets Manager
   aoc-se-secret-shadow-jwt-key   # Shadow JWT 서명 키
@@ -140,26 +140,9 @@ spring:
   /aoc/se/cognito/client-id      # Cognito 클라이언트 ID
 ```
 
-```yaml
-# application-prod.yml.example (형식 공유용)
-spring:
-  datasource:
-    url: ${DB_URL}          # Parameter Store
-    password: ${DB_PASSWORD} # Secrets Manager
-  data:
-    redis:
-      host: ${REDIS_HOST}
-      port: 6379
-```
-
-### .gitignore 추가 필수
-```
-application-prod.yml
-```
-
 ---
 
-## CI/CD (be-ci.yml)
+## CI/CD (be-ci.yml) — Day 5~6 구성 예정
 
 ```yaml
 # PR → 테스트 + 빌드 확인
@@ -231,7 +214,7 @@ abstract class BaseEntity {
 
     @Transient  // DB 컬럼 아님 — 변경 전 값 보관용
     var snapshot: String? = null
-        private set
+        protected set  // allOpen 플러그인과의 호환성으로 protected
 
     @PostLoad
     fun takeSnapshot() {
@@ -241,15 +224,13 @@ abstract class BaseEntity {
 ```
 
 > ULID는 서버에서 생성하므로 `@GeneratedValue` 불필요.
-> DB에 INSERT 전 애플리케이션 레이어에서 ID가 확정됨.
 
 ---
 
-## 히스토리 자동 기록 구조
+## 히스토리 자동 기록 구조 (TODO — Day 4)
 
 비즈니스 코드에 히스토리 저장 코드를 작성하지 않아도 자동으로 기록됨.
 
-### 엔티티 변경 이력 (자동)
 ```
 save() / update() 호출
     → EntityListener (@PrePersist / @PreUpdate / @PreRemove)
@@ -266,88 +247,60 @@ UPDATE 시 before/after 모두 기록:
   → JsonUtils.toJson(entity) (변경 후)                → after_value
 ```
 
-### 쉐도우 감사 로그 (별도 기록)
-엔티티 변경 이력과 별도로 아래 행위도 history 테이블에 기록:
-
-| 행위 | action 값 | 비고 |
-|---|---|---|
-| 쉐도우 로그인 시작 | `SHADOW_LOGIN` | operatorId, targetMemberId 기록 |
-| 쉐도우 로그아웃 | `SHADOW_LOGOUT` | 세션 종료 시각 기록 |
-| 쉐도우 세션 만료 | `SHADOW_EXPIRED` | 30분 만료 시 기록 |
-
-```kotlin
-// 쉐도우 로그인 시작 시 직접 기록 (AOP @ShadowAudit)
-historyRepository.save(History(
-    entityType = "ShadowSession",
-    entityId   = targetMemberId,
-    action     = "SHADOW_LOGIN",
-    actorId    = operatorId,
-    operatorId = operatorId,
-    isShadow   = true
-))
-```
-
-핵심 원칙:
-- 히스토리 저장 실패가 원본 트랜잭션에 영향 없어야 함
-- `HistoryRepository.save()`를 서비스에서 직접 호출하지 않음
-- 단, 쉐도우 로그인 시작/종료는 엔티티 변경이 아니므로 AOP에서 직접 기록
+SpringApplicationContext.kt는 EntityListener에서 Spring Bean(HistoryRepository)을
+꺼내기 위해 Day 4에 구현 예정.
 
 ---
 
 ## 로그인 흐름 및 서버 JWT
 
-Cognito JWT에는 `role` 클레임이 없음. 로그인 완료 후 서버가 role 포함한 자체 JWT를 재발급함.
-
 ```
 1. 클라이언트 → Cognito          소셜 로그인 (OAuth)
 2. Cognito → 클라이언트          Cognito JWT 발급 (role 없음)
 3. 클라이언트 → /auth/callback   Cognito JWT 전달
-4. 서버                          Cognito JWT 검증
+4. 서버                          Cognito JWT 검증 (JWKS 기반 RS256)
                                  DB에서 멤버 조회 (없으면 신규 생성 + MARKETER 역할 부여)
-                                 role 포함한 서버 자체 JWT 발급
-5. 서버 → 클라이언트             서버 JWT 반환 (role, userId 포함)
+                                 role 포함한 서버 자체 JWT 발급 (HS256)
+                                 Refresh Token → Redis 저장 (4시간 TTL)
+5. 서버 → 클라이언트             서버 JWT + Refresh Token 반환
 6. 클라이언트                    이후 모든 API 호출에 서버 JWT 사용
-                                 Cognito JWT는 버림
 ```
 
 서버 JWT 클레임 구조:
 ```kotlin
-data class ServerJwtClaims(
+data class JwtClaims(
     val userId: String,
     val role: Role,
-    val isShadow: Boolean = false  // 일반 로그인은 false
+    val isShadow: Boolean,
+    val jti: String          // 블랙리스트 키로 사용
 )
 ```
 
-일반 JWT와 Shadow JWT 구조 통일:
+Redis 키 구조:
 ```
-일반 로그인  → 서버 JWT (isShadow = false, Cognito가 인증 보증)
-쉐도우 로그인 → Shadow JWT (isShadow = true, 서버가 직접 발급)
+refresh:{userId}        → Refresh Token (TTL 4시간)
+blacklist:{jti}         → 블랙리스트 등록된 Access Token
 ```
 
 ---
 
-## Shadow JWT
-
-쉐도우 로그인은 Cognito 토큰이 아닌 서버 자체 발급 JWT 사용.
+## Shadow JWT (TODO — Day 3)
 
 ```kotlin
+// ShadowJwtProvider.kt 구현 예정
 data class ShadowClaims(
-    val userId: String,          // 대상 마케터 ID (ULID)
-    val role: Role,              // 대상 마케터 역할
-    val operatorId: String,      // 발급한 운영자 ID (ULID)
+    val userId: String,           // 대상 마케터 ID
+    val role: Role,               // 대상 마케터 역할
+    val operatorId: String,       // 발급한 운영자 ID
     val isShadow: Boolean = true,
-    val targetName: String,      // 대상 마케터 이름 (배너 표시용)
-    val targetWorkEmail: String? = null  // 업무용 이메일 (등록된 경우에만, 소셜 이메일 사용 금지)
+    val targetName: String,       // 대상 마케터 이름
+    val targetWorkEmail: String?  // 업무용 이메일 (없으면 null)
 )
 ```
 
-> 소셜 이메일은 개인정보이므로 Shadow JWT에 포함하지 않음.
-> 대상 계정 식별은 이름 + 업무용 이메일 (없으면 이름만) 조합으로 표시.
-
 - 유효기간: 30분
 - 서명 키: AWS Secrets Manager (`aoc-se-secret-shadow-jwt-key`)
-- 만료 시 재발급 없음, 세션 자동 종료
+- 만료 시 재발급 없음
 
 ---
 
@@ -357,108 +310,14 @@ data class ShadowClaims(
 Filter에서 세팅 → EntityListener에서 꺼내 사용.
 
 ```kotlin
+@Component("actorContext")
 object ActorContext {
     private val holder = ThreadLocal<ActorInfo>()
 
-    fun set(actorId: String, operatorId: String?, isShadow: Boolean) {
-        holder.set(ActorInfo(actorId, operatorId, isShadow))
-    }
-
-    fun get(): ActorInfo? = holder.get()
-
-    fun clear() = holder.remove()  // 반드시 요청 종료 시 호출
-}
-```
-
----
-
-## DB 테이블 설계
-
-```sql
--- 회원
-CREATE TABLE member (
-    id          VARCHAR(26)  PRIMARY KEY,              -- ULID (외부 노출 금지)
-    email       VARCHAR(255) NOT NULL UNIQUE,
-    name        VARCHAR(100) NOT NULL,
-    provider    VARCHAR(50)  NOT NULL,                 -- GOOGLE, META, APPLE
-    provider_id VARCHAR(255) NOT NULL,                 -- 소셜 외부 식별자 (내부 저장만, 노출 금지)
-    work_email  VARCHAR(255),
-    role        VARCHAR(50)  NOT NULL DEFAULT 'MARKETER'
-                    CHECK (role IN ('MARKETER', 'AGENCY_MANAGER', 'OPERATOR')),
-    status      VARCHAR(50)  NOT NULL DEFAULT 'ACTIVE'
-                    CHECK (status IN ('ACTIVE', 'DELETED')),
-    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
-);
-
--- 알림 설정
-CREATE TABLE notification_setting (
-    id              VARCHAR(26)  PRIMARY KEY,          -- ULID
-    member_id       VARCHAR(26)  NOT NULL UNIQUE REFERENCES member(id),
-    inquiry_alert   BOOLEAN      NOT NULL DEFAULT true,
-    marketing_alert BOOLEAN      NOT NULL DEFAULT false,
-    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
-);
-
--- 변경 이력
-CREATE TABLE history (
-    id           VARCHAR(26)  PRIMARY KEY,             -- ULID
-    entity_type  VARCHAR(100) NOT NULL,
-    entity_id    VARCHAR(26)  NOT NULL,                -- 대상 엔티티 ULID
-    action       VARCHAR(20)  NOT NULL,                -- CREATE, UPDATE, DELETE, SHADOW_LOGIN 등
-    before_value JSONB,
-    after_value  JSONB,
-    actor_id     VARCHAR(26)  NOT NULL,                -- 실제 행위자 ULID
-    operator_id  VARCHAR(26),                          -- 쉐도우 세션 시 운영자 ULID
-    is_shadow    BOOLEAN      NOT NULL DEFAULT false,
-    created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_history_actor   ON history(actor_id);
-CREATE INDEX idx_history_entity  ON history(entity_type, entity_id);
-CREATE INDEX idx_history_created ON history(created_at);
-```
-
-**ID 전략**
-```
-내부 PK        → ULID (VARCHAR 26) — 추측 불가, 시간순 정렬 가능
-               절대 외부(API 응답, UI)에 노출하지 않음
-소셜 provider_id → 내부 저장 전용 (동일 계정 재가입 감지용)
-               절대 외부 노출하지 않음
-사용자 식별 표시 → 이름 + 이메일 조합
-               예: 홍길동 (hong@gmail.com)
-```
-
-ULID 생성 라이브러리:
-```kotlin
-// build.gradle.kts
-implementation("com.github.f4b6a3:ulid-creator:5.2.0")
-
-// 사용
-val id = UlidCreator.getUlid().toString()
-```
-
-PostgreSQL은 MySQL과 다르게 대소문자를 구분함.
-테이블명, 컬럼명은 snake_case 소문자로 통일할 것.
-before/after 값은 `JSONB` 타입 사용 (인덱싱/쿼리 가능).
-
-`role`, `status`는 PostgreSQL native enum 대신 **VARCHAR + CHECK 제약** 사용.
-native enum은 값 추가 시 `ALTER TYPE` 마이그레이션이 필요하고 운영 중 락이 발생할 수 있음.
-VARCHAR + CHECK는 CHECK 제약만 수정하면 돼서 확장이 쉬움.
-
-Kotlin 코드에서는 enum으로 타입 안전하게 관리:
-```kotlin
-enum class Role { MARKETER, AGENCY_MANAGER, OPERATOR }
-enum class MemberStatus { ACTIVE, DELETED }
-
-@Entity
-class Member : BaseEntity() {
-    @Enumerated(EnumType.STRING)  // DB에 문자열로 저장 (ORDINAL 사용 금지)
-    var role: Role = Role.MARKETER
-
-    @Enumerated(EnumType.STRING)
-    var status: MemberStatus = MemberStatus.ACTIVE
+    fun set(actorId: String, operatorId: String?, isShadow: Boolean)
+    fun get(): ActorInfo?
+    fun clear()  // 반드시 finally 블록에서 호출
+    fun isShadow(): Boolean  // @PreAuthorize("!@actorContext.isShadow()") 에서 사용
 }
 ```
 
@@ -470,137 +329,119 @@ class Member : BaseEntity() {
 data class ApiResponse<T>(
     val success: Boolean,
     val data: T? = null,
-    val message: String? = null
-)
-```
-
----
-
-## CORS 설정
-
-프론트(CloudFront 도메인)와 백엔드(ALB 도메인)가 다른 도메인이므로 CORS 설정 필수.
-
-```kotlin
-@Configuration
-class CorsConfig {
-    @Bean
-    fun corsFilter(): CorsFilter {
-        val config = CorsConfiguration()
-        config.allowedOrigins = listOf(
-            "http://localhost:5173",           // 로컬 개발
-            "https://{cloudfront_domain}"      // 배포 환경 (환경변수로 주입)
+    val message: String? = null,
+    val code: String? = null    // ErrorCode.code (에러 시에만)
+) {
+    companion object {
+        fun <T> ok(data: T) = ApiResponse(success = true, data = data)
+        fun error(errorCode: ErrorCode) = ApiResponse<Nothing>(
+            success = false,
+            message = errorCode.message,
+            code = errorCode.code
         )
-        config.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        config.allowedHeaders = listOf("*")
-        config.allowCredentials = true
-
-        val source = UrlBasedCorsConfigurationSource()
-        source.registerCorsConfiguration("/api/**", config)
-        return CorsFilter(source)
     }
 }
 ```
 
-> CloudFront 도메인은 환경변수(`ALLOWED_ORIGINS`)로 주입받아 사용할 것.
+---
+
+## ErrorCode 구조
+
+```kotlin
+enum class ErrorCode(val status: HttpStatus, val code: String, val message: String) {
+    // Auth: AUTH_00x
+    // Member: MEMBER_00x
+    // Shadow: SHADOW_00x
+    // Permission: PERMISSION_00x
+    // Email: EMAIL_00x
+    // Server: SERVER_00x
+}
+```
+
+새 에러 추가 시 `common/ErrorCode.kt`에만 추가하면 됨.
+
+---
+
+## 예외 처리 구조
+
+```
+BusinessException (open class)
+  └── MemberNotFoundException
+  └── AocAccessDeniedException    # Spring Security AccessDeniedException과 이름 충돌 방지
+  └── ShadowActionNotAllowedException
+
+CognitoJwtException               # Cognito JWT 파싱/검증 실패
+```
+
+모든 예외는 `GlobalExceptionHandler`에서 처리 → `ApiResponse.error()` 형태로 응답.
 
 ---
 
 ## 권한 어노테이션
 
-UI 숨김만으로 보안 처리 완결되지 않음. API 레벨에서도 반드시 동일하게 제어.
-
 ```kotlin
 // 운영자만 접근
 @PreAuthorize("hasRole('OPERATOR')")
 
-// 마케터만 접근
-@PreAuthorize("hasRole('MARKETER')")
+// 쉐도우 세션 제외
+@PreAuthorize("!@actorContext.isShadow()")
 
-// 쉐도우 세션 제외 — 직접 로그인한 경우에만 허용
+// 마케터이면서 쉐도우 세션 제외
 @PreAuthorize("hasRole('MARKETER') and !@actorContext.isShadow()")
 ```
 
 ### API별 권한 매핑
 
-| API | 어노테이션 | 이유 |
-|---|---|---|
-| `PUT /members/me` (내 정보 수정) | `!@actorContext.isShadow()` | 쉐도우 세션 중 대상 마케터 정보 수정 방지 |
-| `PUT /members/me/work-email` (업무 이메일 수정) | `!@actorContext.isShadow()` | 동일 |
-| `DELETE /members/me` (회원 탈퇴) | `hasRole('MARKETER') and !@actorContext.isShadow()` | 쉐도우 세션 중 탈퇴 방지 |
-| `PUT /notification-settings` (알림 설정) | `hasRole('MARKETER') and !@actorContext.isShadow()` | 쉐도우 세션 중 알림 설정 변경 방지 |
-| `PUT /members/{id}/role` (역할 변경) | `hasRole('OPERATOR')` | 운영자만 가능 |
-| `GET /histories` (변경 이력 조회) | `hasRole('OPERATOR')` | 운영자만 가능 |
-| `POST /shadow-login` (쉐도우 로그인) | `hasRole('OPERATOR')` | 운영자만 가능 |
-
-> UI에서 메뉴를 숨겨도 API를 직접 호출하면 접근 가능하므로
-> 서버에서 반드시 위 어노테이션으로 이중 방어할 것.
+| API | 권한 |
+|---|---|
+| `PUT /members/me` | `!@actorContext.isShadow()` |
+| `DELETE /members/me` | `hasRole('MARKETER') and !@actorContext.isShadow()` |
+| `PUT /notification-settings` | `hasRole('MARKETER') and !@actorContext.isShadow()` |
+| `PUT /members/{id}/role` | `hasRole('OPERATOR')` |
+| `GET /histories` | `hasRole('OPERATOR')` |
+| `POST /shadow-login` | `hasRole('OPERATOR')` |
 
 ---
 
-## 업무용 이메일 인증 (AWS SES)
+## DB 테이블 설계
 
-```
-인증 코드 발송 흐름
-1. 업무용 이메일 등록 요청
-2. Redis에 인증 코드 저장 (TTL 5분, 하루 5회 제한 카운터)
-3. AWS SES로 인증 코드 이메일 발송
-4. 사용자가 코드 입력 → Redis에서 검증
-5. 검증 성공 시 DB에 업무용 이메일 저장
-```
+```sql
+CREATE TABLE member (
+    id          VARCHAR(26)  PRIMARY KEY,
+    email       VARCHAR(255) NOT NULL UNIQUE,
+    name        VARCHAR(100) NOT NULL,
+    provider    VARCHAR(50)  NOT NULL,
+    provider_id VARCHAR(255) NOT NULL,
+    work_email  VARCHAR(255),
+    role        VARCHAR(50)  NOT NULL DEFAULT 'MARKETER'
+                    CHECK (role IN ('MARKETER', 'AGENCY_MANAGER', 'OPERATOR')),
+    status      VARCHAR(50)  NOT NULL DEFAULT 'ACTIVE'
+                    CHECK (status IN ('ACTIVE', 'DELETED')),
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
 
-SES 샌드박스 모드 주의:
-```
-샌드박스 모드 (기본)
-  → 인증된 이메일 주소로만 발송 가능
-  → 테스트 시 SES에서 이메일 주소 사전 인증 필요
+CREATE TABLE notification_setting (
+    id              VARCHAR(26)  PRIMARY KEY,
+    member_id       VARCHAR(26)  NOT NULL UNIQUE REFERENCES member(id),
+    inquiry_alert   BOOLEAN      NOT NULL DEFAULT true,
+    marketing_alert BOOLEAN      NOT NULL DEFAULT false,
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
+);
 
-프로덕션 모드 전환
-  → AWS 콘솔에서 SES 프로덕션 접근 요청 필요
-  → 이 과제에서는 샌드박스로 진행, 본인 이메일만 테스트
-```
-
----
-
-## 역할 변경 보안 처리
-
-### 본인 역할 변경 불가
-```kotlin
-fun changeRole(currentUser: AuthUser, targetMemberId: Long, newRole: Role) {
-    // 본인 역할 변경 불가
-    if (currentUser.userId == targetMemberId.toString()) {
-        throw IllegalArgumentException("본인의 역할은 변경할 수 없습니다")
-    }
-    // 역할 변경 로직
-}
-```
-
-### Access Token 블랙리스트
-역할 변경 즉시 기존 Access Token 무효화 필요.
-Refresh Token만 삭제하면 Access Token이 만료(1시간)될 때까지 기존 role로 인식됨.
-
-```kotlin
-// 역할 변경 시 Access Token 블랙리스트 등록
-fun blacklistAccessToken(jti: String, remainingTtl: Duration) {
-    redisTemplate.opsForValue().set(
-        "blacklist:$jti",
-        "1",
-        remainingTtl
-    )
-}
-
-// Security Filter에서 매 요청마다 블랙리스트 체크
-val isBlacklisted = redisTemplate.hasKey("blacklist:$jti")
-if (isBlacklisted == true) throw UnauthorizedException("토큰이 무효화되었습니다")
-```
-
-JWT에 `jti` (JWT ID) 클레임 포함 필수:
-```kotlin
-data class ServerJwtClaims(
-    val userId: String,
-    val role: Role,
-    val isShadow: Boolean = false,
-    val jti: String = UUID.randomUUID().toString()  // 블랙리스트 키로 사용
-)
+CREATE TABLE history (
+    id           VARCHAR(26)  PRIMARY KEY,
+    entity_type  VARCHAR(100) NOT NULL,
+    entity_id    VARCHAR(26)  NOT NULL,
+    action       VARCHAR(20)  NOT NULL,
+    before_value JSONB,
+    after_value  JSONB,
+    actor_id     VARCHAR(26)  NOT NULL,
+    operator_id  VARCHAR(26),
+    is_shadow    BOOLEAN      NOT NULL DEFAULT false,
+    created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
 ```
 
 ---
@@ -608,19 +449,26 @@ data class ServerJwtClaims(
 ## 로컬 실행
 
 ```powershell
+# Docker 컨테이너 실행
+docker start aoc-postgres aoc-redis
+
+# 서버 실행 (PowerShell)
 .\gradlew.bat bootRun
+
+# 또는 IntelliJ에서 AocSeApplication 실행
+# spring.profiles.active=local 자동 적용
+
+# API 문서
+# http://localhost:8080/swagger-ui.html
 ```
 
 ---
 
 ## 주의사항
 
-- Kotlin JPA Entity는 `open class` 또는 allOpen 플러그인 필요
+- Kotlin JPA Entity는 `open class` 또는 allOpen 플러그인 사용
 - `data class`를 JPA Entity로 쓰면 equals/hashCode 문제 발생 → 일반 `class` 사용
-- `build.gradle.kts`에 `kotlin("plugin.jpa")`와 `kotlin("plugin.spring")` 플러그인 추가 필요
-- `application-prod.yml`은 절대 git에 올리지 않을 것
-- Cognito 콜백 처리 (가입 완료 후 DB 저장)는 Lambda 없이 ECS에서 직접 처리
-  → `/auth/callback` API 엔드포인트에서 member 저장
-- Shadow JWT는 Cognito 미사용, ECS가 Secrets Manager 서명 키로 직접 발급/검증
-- Shadow JWT 활성 세션은 Redis에서 관리, 일반 Refresh Token도 Redis에 저장
-- 연관 레포: `aoc-se-fe` (프론트엔드), `aoc-se-infra` (인프라)
+- `@Enumerated(EnumType.STRING)` 필수 (ORDINAL 사용 금지)
+- `application-local.yml`, `application-prod.yml`은 절대 git에 올리지 않을 것
+- Shadow JWT는 Cognito 미사용, 서버가 Secrets Manager 서명 키로 직접 발급/검증
+- `ActorContext.clear()`는 반드시 finally 블록에서 호출
