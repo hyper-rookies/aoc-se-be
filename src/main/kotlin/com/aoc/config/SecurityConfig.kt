@@ -30,6 +30,7 @@ class SecurityConfig(
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/auth/callback").permitAll()
+                    .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                     .anyRequest().authenticated()
             }
             .addFilterBefore(

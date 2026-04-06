@@ -1,9 +1,21 @@
 spring:
   datasource:
-    url: ${DB_URL}          # Parameter Store
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD} # Secrets Manager
+    url: ${DB_URL}                  # e.g. jdbc:postgresql://host:5432/aoc  (Parameter Store: /aoc/se/db/url)
+    username: ${DB_USERNAME}        # e.g. aoc
+    password: ${DB_PASSWORD}        # Secrets Manager: aoc-se-secret-db-password
+    driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: 6379
+      host: ${REDIS_HOST}           # e.g. aoc-redis.xxx.cache.amazonaws.com
+      port: ${REDIS_PORT:6379}
+
+jwt:
+  secret: ${JWT_SECRET}             # Secrets Manager: aoc-se-secret-shadow-jwt-key
+  access-token-expiration: 3600
+
+cognito:
+  user-pool-id: ${COGNITO_USER_POOL_ID}   # Parameter Store: /aoc/se/cognito/user-pool-id
+  client-id: ${COGNITO_CLIENT_ID}         # Parameter Store: /aoc/se/cognito/client-id (formerly /aoc/se/cognito/domain)
+
+cors:
+  allowed-origins: ${ALLOWED_ORIGINS:https://d2aom86zopona0.cloudfront.net}
