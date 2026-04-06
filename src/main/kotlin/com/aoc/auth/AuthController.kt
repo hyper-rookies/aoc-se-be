@@ -22,6 +22,6 @@ class AuthController(
     fun callback(@RequestBody request: CallbackRequest): ApiResponse<LoginResult> {
         val claims = cognitoClient.validateToken(request.cognitoToken)
         val result = memberService.loginOrRegister(claims)
-        return ApiResponse(success = true, data = result)
+        return ApiResponse.ok(result)
     }
 }
