@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${DB_URL}          # Parameter Store
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD} # Secrets Manager
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: 6379
