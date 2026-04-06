@@ -1,5 +1,6 @@
 package com.aoc.member.infra
 
+import com.aoc.auth.CognitoJwtException
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.SignedJWT
@@ -8,8 +9,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
-
-class CognitoJwtException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 data class CognitoClaims(
     val sub: String,
