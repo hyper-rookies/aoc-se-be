@@ -4,8 +4,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
-import org.springframework.web.filter.CorsFilter
 
 @Configuration
 class CorsConfig(
@@ -17,7 +17,7 @@ class CorsConfig(
 ) {
 
     @Bean
-    fun corsFilter(): CorsFilter {
+    fun corsConfigurationSource(): CorsConfigurationSource {
         val origins = buildList {
             if (allowedOriginsLocal.isNotBlank()) add(allowedOriginsLocal)
             addAll(allowedOriginsEnv.split(",").map { it.trim() }.filter { it.isNotBlank() })
@@ -32,6 +32,6 @@ class CorsConfig(
         val source = UrlBasedCorsConfigurationSource()
         source.registerCorsConfiguration("/api/**", config)
         source.registerCorsConfiguration("/auth/**", config)
-        return CorsFilter(source)
+        return source
     }
 }
