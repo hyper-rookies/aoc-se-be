@@ -1,5 +1,7 @@
 package com.aoc.auth
 
+import com.aoc.common.ApiResponse
+import com.aoc.common.ErrorCode
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -69,7 +71,7 @@ class JwtAuthenticationFilter(
         response.contentType = "application/json;charset=UTF-8"
         response.writer.write(
             objectMapper.writeValueAsString(
-                mapOf("success" to false, "message" to "인증이 필요합니다.")
+                ApiResponse.error(ErrorCode.INVALID_ACCESS_TOKEN)
             )
         )
     }
