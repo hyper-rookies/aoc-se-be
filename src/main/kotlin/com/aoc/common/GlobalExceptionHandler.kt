@@ -1,10 +1,8 @@
-package com.aoc.config
+package com.aoc.common
 
-import com.aoc.common.ApiResponse
-import com.aoc.common.BusinessException
-import com.aoc.common.ErrorCode
-import com.aoc.member.infra.CognitoJwtException
+import com.aoc.auth.CognitoJwtException
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -23,6 +21,15 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(ErrorCode.INVALID_COGNITO_TOKEN.status)
             .body(ApiResponse.error(ErrorCode.INVALID_COGNITO_TOKEN))
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidationException(e: MethodArgumentNotValidException): ResponseEntity<ApiResponse<Nothing>> {
+        val message = e.bindingResult.fieldErrors
+            .joinToString(", ") { "${it.field}: ${it.defaultMessage}" }
+        return ResponseEntity
+            .badRequest()
+            .body(ApiResponse(success = false, message = message, code = "VALID_001"))
     }
 
     @ExceptionHandler(IllegalArgumentException::class)
