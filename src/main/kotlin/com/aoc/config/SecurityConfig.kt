@@ -2,6 +2,7 @@ package com.aoc.config
 
 import com.aoc.auth.JwtAuthenticationFilter
 import com.aoc.auth.JwtProvider
+import com.aoc.auth.ShadowJwtProvider
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.core.RedisTemplate
@@ -18,6 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 class SecurityConfig(
     private val jwtProvider: JwtProvider,
+    private val shadowJwtProvider: ShadowJwtProvider,
     private val redisTemplate: RedisTemplate<String, String>
 ) {
 
@@ -34,7 +36,7 @@ class SecurityConfig(
                     .anyRequest().authenticated()
             }
             .addFilterBefore(
-                JwtAuthenticationFilter(jwtProvider, redisTemplate),
+                JwtAuthenticationFilter(jwtProvider, shadowJwtProvider, redisTemplate),
                 UsernamePasswordAuthenticationFilter::class.java
             )
 
