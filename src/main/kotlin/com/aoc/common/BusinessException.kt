@@ -6,5 +6,6 @@ open class BusinessException(
 ) : RuntimeException(message)
 
 class MemberNotFoundException : BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+class MemberStatusException(errorCode: ErrorCode) : BusinessException(errorCode)
 class AocAccessDeniedException : BusinessException(ErrorCode.ACCESS_DENIED)
 class ShadowActionNotAllowedException : BusinessException(ErrorCode.SHADOW_ACTION_NOT_ALLOWED)

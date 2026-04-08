@@ -18,6 +18,12 @@ enum class ErrorCode(
     DUPLICATE_MEMBER(HttpStatus.CONFLICT, "MEMBER_002", "이미 가입된 회원입니다."),
     CANNOT_CHANGE_OWN_ROLE(HttpStatus.BAD_REQUEST, "MEMBER_003", "본인의 역할은 변경할 수 없습니다."),
 
+    // Member Status
+    MEMBER_DORMANT(HttpStatus.FORBIDDEN, "MEMBER_STATUS_001", "휴면 계정입니다. 고객센터에 문의해주세요."),
+    MEMBER_SUSPENDED(HttpStatus.FORBIDDEN, "MEMBER_STATUS_002", "정지된 계정입니다. 고객센터에 문의해주세요."),
+    MEMBER_SECURITY_LOCKOUT(HttpStatus.FORBIDDEN, "MEMBER_STATUS_003", "보안 잠금 상태입니다. 잠시 후 다시 시도해주세요."),
+    MEMBER_PENDING_DELETION(HttpStatus.FORBIDDEN, "MEMBER_STATUS_004", "탈퇴 처리 중인 계정입니다."),
+
     // Shadow
     SHADOW_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SHADOW_001", "쉐도우 세션을 찾을 수 없습니다."),
     SHADOW_SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "SHADOW_002", "쉐도우 세션이 만료되었습니다."),
