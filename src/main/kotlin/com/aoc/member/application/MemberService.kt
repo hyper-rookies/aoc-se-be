@@ -1,8 +1,11 @@
 package com.aoc.member.application
 
 import com.aoc.auth.JwtProvider
+import com.aoc.common.ErrorCode
+import com.aoc.common.MemberStatusException
 import com.aoc.member.domain.Member
 import com.aoc.member.domain.MemberRepository
+import com.aoc.member.domain.MemberStatus
 import com.aoc.member.domain.Role
 import com.aoc.member.infra.CognitoClaims
 import com.aoc.notification.NotificationSetting
@@ -32,14 +35,18 @@ class MemberService(
         val (member, isNewMember) = findOrCreateMember(cognitoClaims)
 
         val jti = UUID.randomUUID().toString()
+
+        // 동시 로그인 차단: 기존 session jti 블랙리스트 등록
+        val oldJti = redisTemplate.opsForValue().get("session:${member.id}")
+        if (oldJti != null) {
+            redisTemplate.opsForValue().set("blacklist:$oldJti", "1", Duration.ofHours(1))
+        }
+
         val accessToken = jwtProvider.generateToken(member.id, member.role, jti)
         val refreshToken = UUID.randomUUID().toString()
 
-        redisTemplate.opsForValue().set(
-            "refresh:${member.id}",
-            refreshToken,
-            Duration.ofHours(4)
-        )
+        redisTemplate.opsForValue().set("refresh:${member.id}", refreshToken, Duration.ofHours(4))
+        redisTemplate.opsForValue().set("session:${member.id}", jti, Duration.ofHours(1))
 
         return LoginResult(
             accessToken = accessToken,
@@ -50,7 +57,8 @@ class MemberService(
 
     private fun findOrCreateMember(claims: CognitoClaims): Pair<Member, Boolean> {
         val existing = memberRepository.findByProviderAndProviderId(claims.provider, claims.sub)
-        if (existing != null) {
+        if (existing != null && existing.status != MemberStatus.DELETED) {
+            validateMemberStatus(existing.status)
             return Pair(existing, false)
         }
 
@@ -67,5 +75,16 @@ class MemberService(
         notificationSettingRepository.save(NotificationSetting(memberId = newMember.id))
 
         return Pair(newMember, true)
+    }
+
+    private fun validateMemberStatus(status: MemberStatus) {
+        when (status) {
+            MemberStatus.ACTIVE -> return
+            MemberStatus.DORMANT -> throw MemberStatusException(ErrorCode.MEMBER_DORMANT)
+            MemberStatus.SUSPENDED -> throw MemberStatusException(ErrorCode.MEMBER_SUSPENDED)
+            MemberStatus.SECURITY_LOCKOUT -> throw MemberStatusException(ErrorCode.MEMBER_SECURITY_LOCKOUT)
+            MemberStatus.PENDING_DELETION -> throw MemberStatusException(ErrorCode.MEMBER_PENDING_DELETION)
+            MemberStatus.DELETED -> return
+        }
     }
 }
