@@ -1,0 +1,32 @@
+spring:
+  profiles:
+    active: ""
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+jwt:
+  secret: test-secret-key-that-is-at-least-32-characters-long-for-hmac!!
+  access-token-expiration: 3600
+
+shadow-jwt:
+  secret: test-shadow-secret-key-that-is-at-least-32-characters-long!!
+
+cognito:
+  user-pool-id: test-pool-id
+  region: ap-northeast-2
+  client-id: test-client-id

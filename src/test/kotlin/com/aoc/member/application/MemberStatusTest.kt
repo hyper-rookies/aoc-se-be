@@ -1,10 +1,14 @@
-package com.aoc.auth
+package com.aoc.member.application
 
+import com.aoc.auth.CognitoJwtException
+import com.aoc.auth.JwtProvider
+import com.aoc.auth.ShadowJwtProvider
+import com.aoc.common.ErrorCode
+import com.aoc.common.MemberStatusException
 import com.aoc.config.SecurityConfig
-import com.aoc.member.application.LoginResult
-import com.aoc.member.application.MemberService
 import com.aoc.member.infra.CognitoClaims
 import com.aoc.member.infra.CognitoClient
+import com.aoc.auth.AuthController
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -22,7 +26,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(AuthController::class)
 @Import(SecurityConfig::class)
-class AuthCallbackTest {
+class MemberStatusTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
@@ -36,7 +40,6 @@ class AuthCallbackTest {
     @MockBean
     private lateinit var memberService: MemberService
 
-    // SecurityConfig 의존성
     @MockBean
     private lateinit var jwtProvider: JwtProvider
 
@@ -47,39 +50,36 @@ class AuthCallbackTest {
     private lateinit var redisTemplate: RedisTemplate<String, String>
 
     @Test
-    fun `유효하지 않은 Cognito 토큰은 401을 반환한다`() {
-        whenever(cognitoClient.validateToken(any())).thenThrow(CognitoJwtException("유효하지 않은 토큰"))
+    fun `DORMANT 계정 로그인은 403과 MEMBER_STATUS_001을 반환한다`() {
+        whenever(cognitoClient.validateToken(any())).thenReturn(
+            CognitoClaims(sub = "sub-123", email = "dormant@example.com", name = "휴면유저")
+        )
+        whenever(memberService.loginOrRegister(any())).thenThrow(MemberStatusException(ErrorCode.MEMBER_DORMANT))
 
         mockMvc.perform(
             post("/auth/callback")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(mapOf("cognitoToken" to "invalid-token")))
+                .content(objectMapper.writeValueAsString(mapOf("cognitoToken" to "token")))
         )
-            .andExpect(status().isUnauthorized)
+            .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.code").value("AUTH_001"))
+            .andExpect(jsonPath("$.code").value("MEMBER_STATUS_001"))
     }
 
     @Test
-    fun `유효한 Cognito 토큰은 200과 JWT를 반환한다`() {
-        val fakeClaims = CognitoClaims(sub = "sub-123", email = "user@example.com", name = "테스트")
-        val loginResult = LoginResult(
-            accessToken = "access-token-value",
-            refreshToken = "refresh-token-value",
-            isNewMember = false
+    fun `SUSPENDED 계정 로그인은 403과 MEMBER_STATUS_002를 반환한다`() {
+        whenever(cognitoClient.validateToken(any())).thenReturn(
+            CognitoClaims(sub = "sub-456", email = "suspended@example.com", name = "정지유저")
         )
-
-        whenever(cognitoClient.validateToken(any())).thenReturn(fakeClaims)
-        whenever(memberService.loginOrRegister(any())).thenReturn(loginResult)
+        whenever(memberService.loginOrRegister(any())).thenThrow(MemberStatusException(ErrorCode.MEMBER_SUSPENDED))
 
         mockMvc.perform(
             post("/auth/callback")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(mapOf("cognitoToken" to "valid-token")))
+                .content(objectMapper.writeValueAsString(mapOf("cognitoToken" to "token")))
         )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.accessToken").value("access-token-value"))
-            .andExpect(jsonPath("$.data.isNewMember").value(false))
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("MEMBER_STATUS_002"))
     }
 }
