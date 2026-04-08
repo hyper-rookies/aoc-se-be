@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component
 data class ActorInfo(
     val actorId: String,
     val operatorId: String?,
+    val shadowId: String?,
     val isShadow: Boolean
 )
 
@@ -12,8 +13,8 @@ data class ActorInfo(
 object ActorContext {
     private val holder = ThreadLocal<ActorInfo>()
 
-    fun set(actorId: String, operatorId: String?, isShadow: Boolean) {
-        holder.set(ActorInfo(actorId, operatorId, isShadow))
+    fun set(actorId: String, operatorId: String?, shadowId: String?, isShadow: Boolean) {
+        holder.set(ActorInfo(actorId, operatorId, shadowId, isShadow))
     }
 
     fun get(): ActorInfo? = holder.get()
