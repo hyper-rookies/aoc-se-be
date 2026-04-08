@@ -38,6 +38,7 @@ dependencies {
     implementation("com.github.f4b6a3:ulid-creator:5.2.0")
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -45,6 +46,7 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
     testImplementation("com.h2database:h2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+
 }
 
 tasks.withType<KotlinCompile> {
