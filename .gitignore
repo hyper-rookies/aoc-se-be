@@ -5,7 +5,6 @@ build/
 
 # Application config
 application-local.yml
-application-prod.yml
 
 # Claude Code
 .claude/
