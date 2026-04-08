@@ -10,8 +10,11 @@ spring:
       port: ${REDIS_PORT:6379}
 
 jwt:
-  secret: ${JWT_SECRET}             # Secrets Manager: aoc-se-secret-shadow-jwt-key
+  secret: ${JWT_SECRET}             # Secrets Manager: aoc-se-secret-jwt-key
   access-token-expiration: 3600
+
+shadow-jwt:
+  secret: ${SHADOW_JWT_SECRET}      # Secrets Manager: aoc-se-secret-shadow-jwt-key
 
 cognito:
   user-pool-id: ${COGNITO_USER_POOL_ID}   # Parameter Store: /aoc/se/cognito/user-pool-id
