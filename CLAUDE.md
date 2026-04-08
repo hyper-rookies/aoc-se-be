@@ -74,15 +74,17 @@ aoc-se-be/
 │   │   └── infra/
 │   │       └── CognitoClient.kt            ✅ JWKS 기반 검증
 │   ├── auth/
-│   │   ├── AuthController.kt               ✅ POST /auth/callback / 🆕 Day 3 추가 (POST/DELETE /shadow-login)
+│   │   ├── AuthController.kt               ✅ POST /auth/callback
 │   │   ├── JwtProvider.kt                  ✅ HS256, jti 포함
-│   │   ├── JwtAuthenticationFilter.kt      ✅ Bearer 추출 → 검증 → 블랙리스트 / 🔧 Day 3 수정 (동시 로그인 차단)
-│   │   ├── ActorContext.kt                 ✅ ThreadLocal, @Component("actorContext") / 🔧 Day 3 수정 (shadowId 추가)
+│   │   ├── JwtAuthenticationFilter.kt      ✅ Bearer 추출 → 검증 → 블랙리스트 → 동시로그인 차단 / Shadow JWT 분기 처리
+│   │   ├── ActorContext.kt                 ✅ ThreadLocal, shadowId 포함
 │   │   ├── CognitoJwtException.kt          ✅
-│   │   └── ShadowJwtProvider.kt            🆕 Day 3 신규
+│   │   ├── ShadowJwtProvider.kt            ✅ Day 3 완료
+│   │   ├── ShadowService.kt                ✅ Day 3 완료
+│   │   └── ShadowController.kt             ✅ Day 3 완료 (POST/DELETE /shadow-login)
 │   ├── history/
-│   │   ├── History.kt                      (골격만) / 🔧 Day 3 수정 (shadow_id 필드 추가) / Day 4 완성
-│   │   ├── HistoryRepository.kt            🆕 Day 3 신규 (쉐도우 감사 로그용)
+│   │   ├── History.kt                      ✅ Day 3 완료 (shadowId 포함) / Day 4에 EntityListener 연동
+│   │   ├── HistoryRepository.kt            ✅ Day 3 완료
 │   │   ├── HistoryEntityListener.kt        (stub — Day 4)
 │   │   └── HistoryEventHandler.kt          (미구현 — Day 4)
 │   ├── notification/
@@ -119,88 +121,40 @@ aoc-se-be/
 
 ## Day별 작업 대상 파일
 
-### Day 3 — 쉐도우 로그인 + DB 스키마 확장
+### Day 3 — 쉐도우 로그인 + DB 스키마 확장 ✅ 완료
 
-> ⚠️ 아래 파일들은 Day 2에 이미 구현된 것을 **수정**하는 작업임. 새로 만들지 말 것.
+#### 🗄️ DB 수정 완료 (로컬 적용됨)
 
-#### 🔧 수정 대상 파일
-
-**`member/domain/Member.kt`**
-```kotlin
-// MemberStatus enum 확장
-enum class MemberStatus {
-    ACTIVE,
-    DORMANT,           // 휴면 (상태값만 준비, 전환 정책은 본 프로젝트)
-    SUSPENDED,         // 정지 (관리자 수동)
-    SECURITY_LOCKOUT,  // 잠금 (반복 실패 자동 — 본 프로젝트 구현)
-    PENDING_DELETION,  // 탈퇴 대기
-    DELETED
-}
-
-// deletedAt 필드 추가
-var deletedAt: LocalDateTime? = null
-```
-
-**`member/application/MemberService.kt`**
-```kotlin
-// loginOrRegister()에 두 가지 처리 추가:
-// 1. status 검증 — ACTIVE가 아니면 MemberStatusException(ErrorCode.MEMBER_DORMANT 등) 던지기
-// 2. 동시 로그인 차단 — 기존 session:{userId}의 jti를 blacklist:{jti}에 등록 후 새 jti로 교체
-```
-
-**`auth/ActorContext.kt`**
-```kotlin
-// set() 시그니처에 shadowId 파라미터 추가
-fun set(actorId: String, operatorId: String?, shadowId: String?, isShadow: Boolean)
-
-// ActorInfo data class에도 shadowId: String? 추가
-```
-
-**`auth/JwtAuthenticationFilter.kt`**
-```kotlin
-// 블랙리스트 체크 이후에 동시 로그인 차단 체크 추가:
-// session:{userId} 에 저장된 jti와 현재 토큰 jti가 다르면 → 401 반환
-// (단, Shadow JWT는 이 체크 대상에서 제외 — isShadow=true인 경우 skip)
-```
-
-**`common/ErrorCode.kt`**
-```kotlin
-// MEMBER_STATUS 에러코드 4종 추가
-MEMBER_DORMANT(HttpStatus.FORBIDDEN, "MEMBER_STATUS_001", "휴면 계정입니다. 고객센터에 문의해주세요.")
-MEMBER_SUSPENDED(HttpStatus.FORBIDDEN, "MEMBER_STATUS_002", "정지된 계정입니다. 고객센터에 문의해주세요.")
-MEMBER_SECURITY_LOCKOUT(HttpStatus.FORBIDDEN, "MEMBER_STATUS_003", "보안 잠금 상태입니다. 잠시 후 다시 시도해주세요.")
-MEMBER_PENDING_DELETION(HttpStatus.FORBIDDEN, "MEMBER_STATUS_004", "탈퇴 처리 중인 계정입니다.")
-```
-
-**`common/BusinessException.kt`**
-```kotlin
-// MemberStatusException 추가
-class MemberStatusException(errorCode: ErrorCode) : BusinessException(errorCode)
-```
-
-**`history/History.kt`** (골격 → 부분 완성)
-```kotlin
-// shadow_id 필드 추가
-var shadowId: String? = null
-```
-
-#### 🆕 신규 파일
-
-- `auth/ShadowJwtProvider.kt` — Shadow JWT 발급/검증
-- `auth/ShadowController.kt` — POST /shadow-login, DELETE /shadow-login
-- `auth/ShadowService.kt` — 쉐도우 로그인 비즈니스 로직
-- `history/HistoryRepository.kt` — 쉐도우 감사 로그 저장용
-
-#### 🗄️ DB 수정 (ALTER — CREATE 아님)
-
-로컬 Docker PostgreSQL에 직접 실행:
 ```sql
-ALTER TABLE member DROP CONSTRAINT IF EXISTS member_status_check;
+ALTER TABLE member DROP CONSTRAINT member_status_check;
 ALTER TABLE member ADD CONSTRAINT member_status_check
     CHECK (status IN ('ACTIVE', 'DORMANT', 'SUSPENDED', 'SECURITY_LOCKOUT', 'PENDING_DELETION', 'DELETED'));
 ALTER TABLE member ADD COLUMN deleted_at TIMESTAMP;
 ALTER TABLE history ADD COLUMN shadow_id VARCHAR(26);
 ```
+
+#### ✅ 완료된 파일
+- `Member.kt` — MemberStatus 6종, deletedAt
+- `MemberService.kt` — 상태 검증, 동시 로그인 차단
+- `ActorContext.kt` — shadowId 추가
+- `JwtAuthenticationFilter.kt` — Shadow JWT 분기(ShadowJwtProvider), 동시 로그인 차단
+- `SecurityConfig.kt` — ShadowJwtProvider 주입
+- `ErrorCode.kt` — MEMBER_STATUS 4종
+- `BusinessException.kt` — MemberStatusException
+- `History.kt` — shadowId 필드
+- `ShadowJwtProvider.kt` / `ShadowService.kt` / `ShadowController.kt` / `HistoryRepository.kt` 신규 생성
+
+#### ⚠️ Day 3 특이사항 (다음 작업 시 참고)
+
+1. **History JSONB 매핑** — `before_value`, `after_value`는 DB가 JSONB 타입이므로 엔티티 필드에 반드시 `@Column(columnDefinition = "jsonb")` 명시 필요. 없으면 schema-validation 에러 발생.
+
+2. **Shadow JWT 서명 키 주입 방식** — 로컬은 `application-local.yml`의 `shadow-jwt.secret` 값 사용. prod는 Secrets Manager에서 주입. `application-prod.yml.example`에 아래 항목 추가 필요:
+   ```yaml
+   shadow-jwt:
+     secret: ${SHADOW_JWT_SECRET}
+   ```
+
+3. **JwtAuthenticationFilter 분기** — 토큰의 `isShadow` 클레임으로 `ShadowJwtProvider` / `JwtProvider` 분기. Shadow JWT는 동시 로그인 차단 체크(`session:{userId}`) skip.
 
 ---
 
@@ -663,3 +617,5 @@ docker start aoc-postgres aoc-redis
 - DB 스키마 변경은 반드시 ALTER 방식으로 — Day 2 이후 CREATE TABLE 재실행 금지
 - MemberStatus.DORMANT는 상태값만 준비, 전환 정책은 본 프로젝트에서 결정
 - PENDING_DELETION → DELETED 배치 전환은 본 프로젝트 구현 대상 (과제 범위 밖)
+- History의 `before_value`, `after_value`는 `@Column(columnDefinition = "jsonb")` 필수
+- Shadow JWT 서명 키는 로컬 `application-local.yml`, prod는 Secrets Manager — `application-prod.yml.example`에 `shadow-jwt.secret: ${SHADOW_JWT_SECRET}` 추가 필요
