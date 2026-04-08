@@ -85,8 +85,8 @@ aoc-se-be/
 │   ├── history/
 │   │   ├── History.kt                      ✅ Day 3 완료 (shadowId 포함) / Day 4에 EntityListener 연동
 │   │   ├── HistoryRepository.kt            ✅ Day 3 완료
-│   │   ├── HistoryEntityListener.kt        (stub — Day 4)
-│   │   └── HistoryEventHandler.kt          (미구현 — Day 4)
+│   │   ├── HistoryEntityListener.kt        ✅ Day 4 완료
+│   │   └── HistoryEventHandler.kt          ✅ Day 4 완료
 │   ├── notification/
 │   │   ├── NotificationSetting.kt          ✅
 │   │   └── NotificationSettingRepository.kt ✅
@@ -96,7 +96,7 @@ aoc-se-be/
 │   │   ├── ErrorCode.kt                    ✅ ErrorCode enum / 🔧 Day 3 수정 (MEMBER_STATUS 에러코드 추가)
 │   │   ├── BusinessException.kt            ✅ + 하위 예외 클래스 / 🔧 Day 3 수정 (MemberStatusException 추가)
 │   │   ├── GlobalExceptionHandler.kt       ✅ MethodArgumentNotValidException 포함
-│   │   └── SpringApplicationContext.kt     (비어있음 — Day 4에 채울 예정)
+│   │   └── SpringApplicationContext.kt     ✅ Day 4 완료
 │   └── config/
 │       ├── SecurityConfig.kt               ✅ STATELESS, CSRF off, JwtFilter 등록
 │       ├── CorsConfig.kt                   ✅ 로컬 5173 + CloudFront
@@ -106,7 +106,7 @@ aoc-se-be/
 ├── src/main/resources/
 │   ├── application.yml                     공통 설정 (profiles.active=local)
 │   ├── application-local.yml               로컬 개발용 (git 제외)
-│   ├── application-prod.yml                배포용 환경변수 참조 (git 제외)
+│   ├── application-prod.yml                배포용 환경변수 참조 (git 포함 — ${ENV_VAR} 참조만)
 │   └── application-prod.yml.example        환경변수 키 목록 문서화 (git 포함)
 ├── build.gradle.kts
 ├── Dockerfile
@@ -158,6 +158,16 @@ ALTER TABLE history ADD COLUMN shadow_id VARCHAR(26);
 
 ---
 
+### Day 4 — 히스토리 자동 기록 ✅ 완료 (4/8)
+
+- `SpringApplicationContext.kt` — ApplicationContextAware 브릿지 구현
+- `HistoryEntityListener.kt` — @PrePersist / @PreUpdate / @PreRemove 이벤트 발행
+- `HistoryEventHandler.kt` — @TransactionalEventListener(AFTER_COMMIT) + @Transactional(REQUIRES_NEW)
+- `HistoryEntityListenerTest.kt` — H2 JSONB 호환 처리 (schema.sql + ddl-auto: none)
+- 테스트 전체 통과
+
+---
+
 ## 코딩 컨벤션
 
 → `CONVENTION.md` 참고
@@ -187,33 +197,19 @@ Spring은 `application-prod.yml`의 `${ENV_VAR}` 형태로 읽음.
 
 ---
 
-## CI/CD (be-ci.yml) — Day 5~6 구성 예정
+## CI/CD (be-ci.yml) ✅ 동작 확인
 
-```yaml
-# PR → 테스트 + 빌드 확인
-# main 머지 → ECR push → ECS 재배포
+- PR → 테스트 (`./gradlew test`)
+- main 머지 → bootJar → Docker 빌드 → ECR push → ECS 재배포
+- `role-to-assume`: `arn:aws:iam::148761639846:role/HyperLimitedAccessRole`
+- `role-skip-session-tagging`: true
+- `registries`: `"148761639846"`
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:           # PR 시 실행
-  build-and-push: # main 머지 시 실행
-    # 1. bootJar 빌드
-    # 2. Docker 이미지 빌드 (eclipse-temurin:17-jre-jammy)
-    # 3. ECR push (aoc-se-ecr-chat)
-    # 4. ECS 서비스 재배포 (aoc-se-ecs-chat-service)
-```
-
-GitHub Repository Secrets 등록 필요:
+GitHub Repository Secrets 등록 완료:
 ```
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 AWS_REGION
-ECR_REGISTRY
 ```
 
 ---
@@ -272,7 +268,7 @@ abstract class BaseEntity {
 
 ---
 
-## 히스토리 자동 기록 구조 (TODO — Day 4)
+## 히스토리 자동 기록 구조 ✅ Day 4 완료
 
 비즈니스 코드에 히스토리 저장 코드를 작성하지 않아도 자동으로 기록됨.
 
@@ -292,8 +288,8 @@ UPDATE 시 before/after 모두 기록:
   → JsonUtils.toJson(entity) (변경 후)                → after_value
 ```
 
-SpringApplicationContext.kt는 EntityListener에서 Spring Bean(HistoryRepository)을
-꺼내기 위해 Day 4에 구현 예정.
+SpringApplicationContext.kt — ApplicationContextAware 브릿지.
+EntityListener에서 Spring Bean(HistoryRepository)을 꺼내기 위해 사용.
 
 ---
 
@@ -611,7 +607,10 @@ docker start aoc-postgres aoc-redis
 - Kotlin JPA Entity는 `open class` 또는 allOpen 플러그인 사용
 - `data class`를 JPA Entity로 쓰면 equals/hashCode 문제 발생 → 일반 `class` 사용
 - `@Enumerated(EnumType.STRING)` 필수 (ORDINAL 사용 금지)
-- `application-local.yml`, `application-prod.yml`은 절대 git에 올리지 않을 것
+- `application.yml`은 git 포함 (공통 설정, 민감 정보 없음)
+- `application-prod.yml`은 git 포함 (`${ENV_VAR}` 참조만 있음)
+- `application-local.yml`은 절대 git에 올리지 않을 것
+- JAVA_HOME은 Java 17로 설정 필요 (ms-17.0.18 또는 temurin-17)
 - Shadow JWT는 Cognito 미사용, 서버가 Secrets Manager 서명 키로 직접 발급/검증
 - `ActorContext.clear()`는 반드시 finally 블록에서 호출
 - DB 스키마 변경은 반드시 ALTER 방식으로 — Day 2 이후 CREATE TABLE 재실행 금지
