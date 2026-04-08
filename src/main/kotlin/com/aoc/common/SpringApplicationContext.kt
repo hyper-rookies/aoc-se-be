@@ -15,5 +15,7 @@ class SpringApplicationContext : ApplicationContextAware {
         private lateinit var applicationContext: ApplicationContext
 
         fun <T> getBean(beanClass: Class<T>): T = applicationContext.getBean(beanClass)
+
+        fun publishEvent(event: Any) = applicationContext.publishEvent(event)
     }
 }

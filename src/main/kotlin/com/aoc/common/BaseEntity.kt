@@ -1,6 +1,7 @@
 package com.aoc.common
 
 import com.aoc.history.HistoryEntityListener
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.f4b6a3.ulid.UlidCreator
 import jakarta.persistence.EntityListeners
@@ -26,6 +27,8 @@ abstract class BaseEntity {
 
     @PostLoad
     fun takeSnapshot() {
-        snapshot = jacksonObjectMapper().writeValueAsString(this)
+        snapshot = jacksonObjectMapper()
+            .registerModule(JavaTimeModule())
+            .writeValueAsString(this)
     }
 }

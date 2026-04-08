@@ -3,6 +3,7 @@ package com.aoc.history
 import com.aoc.auth.ActorInfo
 import com.aoc.common.BaseEntity
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
@@ -22,6 +23,7 @@ class HistoryEventHandler(private val historyRepository: HistoryRepository) {
     private abstract class BaseEntityMixin
 
     private val mapper = jacksonObjectMapper()
+        .registerModule(JavaTimeModule())
         .addMixIn(BaseEntity::class.java, BaseEntityMixin::class.java)
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
