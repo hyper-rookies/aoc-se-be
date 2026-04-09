@@ -70,9 +70,9 @@ class HistoryControllerTest {
     }
 
     @Test
-    fun `인증 없이 GET histories 호출 시 403을 반환한다`() {
+    fun `인증 없이 GET histories 호출 시 401을 반환한다`() {
         mockMvc.perform(get("/histories"))
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
     }
 
     @Test

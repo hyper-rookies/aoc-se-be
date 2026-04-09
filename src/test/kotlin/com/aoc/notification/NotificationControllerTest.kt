@@ -94,9 +94,9 @@ class NotificationControllerTest {
     // --- GET /notification-settings ---
 
     @Test
-    fun `인증 없이 GET notification-settings 호출 시 403을 반환한다`() {
+    fun `인증 없이 GET notification-settings 호출 시 401을 반환한다`() {
         mockMvc.perform(get("/notification-settings"))
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
     }
 
     @Test
