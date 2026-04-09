@@ -2,6 +2,7 @@ package com.aoc.auth
 
 import com.aoc.common.ShadowActionNotAllowedException
 import com.aoc.history.History
+import com.aoc.history.HistoryAction
 import com.aoc.history.HistoryRepository
 import com.aoc.member.domain.MemberRepository
 import com.aoc.member.domain.Role
@@ -55,7 +56,7 @@ class ShadowService(
             History(
                 entityType = "Member",
                 entityId = targetMemberId,
-                action = "SHADOW_START",
+                action = HistoryAction.SHADOW_LOGIN_START,
                 actorId = targetMemberId,
                 operatorId = operatorId,
                 shadowId = shadowClaims.jti,
@@ -75,7 +76,7 @@ class ShadowService(
             History(
                 entityType = "Member",
                 entityId = targetMemberId,
-                action = "SHADOW_END",
+                action = HistoryAction.SHADOW_LOGIN_END,
                 actorId = targetMemberId,
                 operatorId = operatorId,
                 shadowId = shadowJti,

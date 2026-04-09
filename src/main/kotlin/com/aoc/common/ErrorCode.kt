@@ -33,10 +33,10 @@ enum class ErrorCode(
     SHADOW_ACTION_NOT_ALLOWED(HttpStatus.FORBIDDEN, "PERMISSION_002", "쉐도우 세션 중에는 이 작업을 수행할 수 없습니다."),
 
     // Email
-    EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_001", "이메일 발송에 실패했습니다."),
-    INVALID_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "EMAIL_002", "유효하지 않은 인증 코드입니다."),
-    VERIFICATION_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "EMAIL_003", "만료된 인증 코드입니다."),
-    EMAIL_VERIFICATION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "EMAIL_004", "이메일 인증 횟수를 초과했습니다."),
+    EMAIL_ALREADY_USED(HttpStatus.CONFLICT, "EMAIL_001", "이미 사용 중인 이메일입니다."),
+    EMAIL_VERIFY_EXPIRED(HttpStatus.BAD_REQUEST, "EMAIL_002", "인증 코드가 만료되었습니다."),
+    EMAIL_VERIFY_INVALID(HttpStatus.BAD_REQUEST, "EMAIL_003", "인증 코드가 올바르지 않습니다."),
+    EMAIL_VERIFY_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "EMAIL_004", "인증 시도 횟수를 초과했습니다."),
 
     // Server
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "SERVER_001", "서버 오류가 발생했습니다.")

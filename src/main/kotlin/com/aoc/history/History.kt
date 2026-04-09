@@ -3,6 +3,8 @@ package com.aoc.history
 import com.github.f4b6a3.ulid.UlidCreator
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import java.time.LocalDateTime
@@ -14,7 +16,8 @@ class History(
     val id: String = UlidCreator.getUlid().toString(),
     val entityType: String,
     val entityId: String,
-    val action: String,
+    @Enumerated(EnumType.STRING)
+    val action: HistoryAction,
     @Column(columnDefinition = "jsonb")
     var beforeValue: String? = null,
     @Column(columnDefinition = "jsonb")

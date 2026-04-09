@@ -44,7 +44,7 @@ class HistoryEntityListenerTest {
 
         assertEquals(1, histories.size)
         val h = histories[0]
-        assertEquals("INSERT", h.action)
+        assertEquals(HistoryAction.PERSIST, h.action)
         assertNull(h.beforeValue)
         assertNotNull(h.afterValue)
         assertEquals("system", h.actorId)  // ActorContext 미설정 시 system
@@ -75,10 +75,10 @@ class HistoryEntityListenerTest {
             .sortedBy { it.createdAt }
 
         assertEquals(2, histories.size)
-        assertEquals("INSERT", histories[0].action)
+        assertEquals(HistoryAction.PERSIST, histories[0].action)
 
         val updateHistory = histories[1]
-        assertEquals("UPDATE", updateHistory.action)
+        assertEquals(HistoryAction.UPDATE, updateHistory.action)
         assertNotNull(updateHistory.beforeValue)
         assertNotNull(updateHistory.afterValue)
         assertTrue(updateHistory.beforeValue!!.contains("수정전"))

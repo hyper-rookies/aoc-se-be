@@ -29,24 +29,24 @@ class HistoryEventHandler(private val historyRepository: HistoryRepository) {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handleCreated(event: EntityCreatedEvent) {
-        saveHistory(event.entity, "INSERT", null, mapper.writeValueAsString(event.entity), event.actorInfo)
+        saveHistory(event.entity, HistoryAction.PERSIST, null, mapper.writeValueAsString(event.entity), event.actorInfo)
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handleUpdated(event: EntityUpdatedEvent) {
-        saveHistory(event.entity, "UPDATE", event.snapshot, mapper.writeValueAsString(event.entity), event.actorInfo)
+        saveHistory(event.entity, HistoryAction.UPDATE, event.snapshot, mapper.writeValueAsString(event.entity), event.actorInfo)
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handleDeleted(event: EntityDeletedEvent) {
-        saveHistory(event.entity, "DELETE", mapper.writeValueAsString(event.entity), null, event.actorInfo)
+        saveHistory(event.entity, HistoryAction.DELETE, mapper.writeValueAsString(event.entity), null, event.actorInfo)
     }
 
     private fun saveHistory(
         entity: BaseEntity,
-        action: String,
+        action: HistoryAction,
         before: String?,
         after: String?,
         actor: ActorInfo?
