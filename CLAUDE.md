@@ -212,6 +212,14 @@ ALTER TABLE history ADD COLUMN shadow_id VARCHAR(26);
 - `HistoryEntityListenerTest.kt` — H2 JSONB 호환 처리 (schema.sql + ddl-auto: none)
 - 테스트 전체 통과
 
+#### ⚠️ Day 5 특이사항 (다음 작업 시 참고)
+
+1. **History JSONB @JdbcTypeCode 필수** — `@Column(columnDefinition = "jsonb")`는 DDL 생성용. 런타임 INSERT/UPDATE 시 PostgreSQL VARCHAR→JSONB 자동 캐스팅 불가 → `@JdbcTypeCode(SqlTypes.JSON)` 반드시 병행. H2 테스트에서는 통과되므로 주의.
+
+2. **Authorization Code Grant** — `AuthController`가 `code + redirectUri`를 받아 `CognitoClient.exchangeCodeForToken()`으로 id_token 교환 후 검증. 기존 `cognitoToken` 직접 수신 방식에서 변경됨.
+
+3. **Cognito Google 클라이언트 ID** — Terraform에 전체 값(`929943265981-qu700vqjr0efl23t1glp597nkbn0aegd.apps.googleusercontent.com`) 그대로 등록 필요. Cognito가 `.apps.googleusercontent.com`을 자동으로 붙이지 않음.
+
 ---
 
 ## 코딩 컨벤션
@@ -675,3 +683,8 @@ docker start aoc-postgres aoc-redis
 - OPERATOR는 본인 역할 변경 불가 (`ActorContext.userId == pathVariable id` 체크)
 - CSV export: `from~to` 범위 90일 초과 시 400 반환
 - SES 발신자: `ses.from-address` 설정값 사용 (로컬: `local@test.com`, prod: SES 인증된 이메일)
+- History JSONB 런타임 바인딩: `@Column(columnDefinition = "jsonb")`만으로 부족, `@JdbcTypeCode(SqlTypes.JSON)` 병행 필수 (DDL용 vs 런타임 바인딩용 역할 분리)
+- H2는 타입 검사 느슨 → 테스트 통과해도 PostgreSQL에서 JSONB 타입 에러 날 수 있음
+- `CognitoClient.exchangeCodeForToken()`: Authorization Code → id_token 교환. code는 일회용이므로 재사용 불가
+- `application-local.yml`에 `cognito.domain` 추가 필요 (exchangeCodeForToken 사용)
+- `application-prod.yml`에 `cognito.domain: ${COGNITO_DOMAIN}` 추가 필요
