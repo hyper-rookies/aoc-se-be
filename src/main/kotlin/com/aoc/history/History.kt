@@ -7,6 +7,8 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 
 @Entity
@@ -18,8 +20,10 @@ class History(
     val entityId: String,
     @Enumerated(EnumType.STRING)
     val action: HistoryAction,
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     var beforeValue: String? = null,
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     var afterValue: String? = null,
     val actorId: String,
