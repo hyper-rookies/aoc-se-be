@@ -21,7 +21,8 @@ class CognitoClientTest {
     private val cognitoClient = CognitoClient(
         userPoolId = "ap-northeast-2_testPool",
         region = "ap-northeast-2",
-        clientId = "test-client-id"
+        clientId = "test-client-id",
+        cognitoDomain = "test.auth.ap-northeast-2.amazoncognito.com"
     )
 
     companion object {
