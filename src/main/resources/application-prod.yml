@@ -1,4 +1,9 @@
 spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    baseline-on-migrate: false
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -23,3 +28,6 @@ cognito:
 
 cors:
   allowed-origins: ${ALLOWED_ORIGINS:https://d2aom86zopona0.cloudfront.net}
+
+ses:
+  from-address: ${SES_FROM_ADDRESS}
