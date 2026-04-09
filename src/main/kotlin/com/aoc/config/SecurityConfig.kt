@@ -3,6 +3,7 @@ package com.aoc.config
 import com.aoc.auth.JwtAuthenticationFilter
 import com.aoc.auth.JwtProvider
 import com.aoc.auth.ShadowJwtProvider
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.core.RedisTemplate
@@ -40,6 +41,11 @@ class SecurityConfig(
                     ).permitAll()
 
                     .anyRequest().authenticated()
+            }
+            .exceptionHandling {
+                it.authenticationEntryPoint { _, response, _ ->
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED)
+                }
             }
             .addFilterBefore(
                 JwtAuthenticationFilter(jwtProvider, shadowJwtProvider, redisTemplate),
