@@ -1,10 +1,15 @@
 package com.aoc.member.application
 
 import com.aoc.auth.JwtProvider
+import com.aoc.auth.ShadowService
 import com.aoc.common.AocAccessDeniedException
+import com.aoc.common.BusinessException
 import com.aoc.common.ErrorCode
 import com.aoc.common.MemberNotFoundException
 import com.aoc.common.MemberStatusException
+import com.aoc.history.History
+import com.aoc.history.HistoryAction
+import com.aoc.history.HistoryRepository
 import com.aoc.member.domain.Member
 import com.aoc.member.domain.MemberRepository
 import com.aoc.member.domain.MemberStatus
@@ -17,6 +22,7 @@ import com.aoc.notification.NotificationSettingRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.domain.Specification
+import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -35,8 +41,12 @@ class MemberService(
     private val memberRepository: MemberRepository,
     private val notificationSettingRepository: NotificationSettingRepository,
     private val jwtProvider: JwtProvider,
-    private val redisTemplate: RedisTemplate<String, String>
+    private val redisTemplate: RedisTemplate<String, String>,
+    private val historyRepository: HistoryRepository,
+    private val shadowService: ShadowService
 ) {
+
+    private val log = LoggerFactory.getLogger(MemberService::class.java)
 
     @Transactional
     fun loginOrRegister(cognitoClaims: CognitoClaims): LoginResult {
@@ -53,8 +63,24 @@ class MemberService(
         val accessToken = jwtProvider.generateToken(member.id, member.role, jti)
         val refreshToken = UUID.randomUUID().toString()
 
-        redisTemplate.opsForValue().set("refresh:${member.id}", refreshToken, Duration.ofHours(4))
-        redisTemplate.opsForValue().set("session:${member.id}", jti, Duration.ofHours(1))
+        try {
+            redisTemplate.opsForValue().set("refresh:${member.id}", refreshToken, Duration.ofHours(4))
+            redisTemplate.opsForValue().set("session:${member.id}", jti, Duration.ofHours(1))
+        } catch (e: Exception) {
+            log.error("Redis 저장 실패 — 로그인 롤백: ${member.id}", e)
+            throw BusinessException(ErrorCode.INTERNAL_SERVER_ERROR)
+        }
+
+        historyRepository.save(
+            History(
+                entityType = "Member",
+                entityId = member.id,
+                action = HistoryAction.LOGIN,
+                afterValue = """{"provider": "${member.provider}", "loginAt": "${LocalDateTime.now()}"}""",
+                actorId = member.id,
+                isShadow = false
+            )
+        )
 
         return LoginResult(
             accessToken = accessToken,
@@ -80,6 +106,12 @@ class MemberService(
         val member = memberRepository.findById(userId).orElseThrow { MemberNotFoundException() }
         member.status = MemberStatus.PENDING_DELETION
         member.deletedAt = LocalDateTime.now()
+
+        val jti = redisTemplate.opsForValue().get("session:$userId")
+        if (jti != null) {
+            redisTemplate.opsForValue().set("blacklist:$jti", "1", Duration.ofHours(1))
+            redisTemplate.delete("session:$userId")
+        }
     }
 
     @Transactional
@@ -94,6 +126,19 @@ class MemberService(
             redisTemplate.opsForValue().set("blacklist:$jti", "1", Duration.ofHours(1))
             redisTemplate.delete("session:${target.id}")
         }
+
+        shadowService.invalidateShadowByTarget(targetId)
+    }
+
+    @Transactional
+    fun updateMemberStatus(operatorId: String, targetId: String, newStatus: MemberStatus) {
+        if (operatorId == targetId) throw AocAccessDeniedException()
+
+        val member = memberRepository.findById(targetId).orElseThrow { MemberNotFoundException() }
+        member.status = newStatus
+        memberRepository.save(member)
+
+        shadowService.invalidateShadowByTarget(targetId)
     }
 
     @Transactional(readOnly = true)
