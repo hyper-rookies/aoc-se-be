@@ -159,7 +159,7 @@ ALTER TABLE history ADD COLUMN shadow_id VARCHAR(26);
 
 #### ⚠️ Day 3 특이사항 (다음 작업 시 참고)
 
-1. **History JSONB 매핑** — `before_value`, `after_value`는 DB가 JSONB 타입이므로 엔티티 필드에 반드시 `@Column(columnDefinition = "jsonb")` 명시 필요. 없으면 schema-validation 에러 발생.
+1. **History JSONB 매핑** — `before_value`, `after_value`는 DB가 JSONB 타입이므로 엔티티 필드에 반드시 `@Column(columnDefinition = "jsonb")` 명시 필요. 없으면 schema-validation 에러 발생. `@JdbcTypeCode(SqlTypes.JSON)` 사용 금지 — H2 테스트에서 history INSERT 실패 원인. PostgreSQL JSONB 암묵적 캐스팅은 JDBC URL의 `stringtype=unspecified`로 처리.
 
 2. **Shadow JWT 서명 키 주입 방식** — 로컬은 `application-local.yml`의 `shadow-jwt.secret` 값 사용. prod는 Secrets Manager에서 주입. `application-prod.yml.example`에 아래 항목 추가 필요:
    ```yaml
@@ -214,7 +214,7 @@ ALTER TABLE history ADD COLUMN shadow_id VARCHAR(26);
 
 #### ⚠️ Day 5 특이사항 (다음 작업 시 참고)
 
-1. **History JSONB @JdbcTypeCode 필수** — `@Column(columnDefinition = "jsonb")`는 DDL 생성용. 런타임 INSERT/UPDATE 시 PostgreSQL VARCHAR→JSONB 자동 캐스팅 불가 → `@JdbcTypeCode(SqlTypes.JSON)` 반드시 병행. H2 테스트에서는 통과되므로 주의.
+1. **History JSONB 매핑** — `@Column(columnDefinition = "jsonb")`만 사용. `@JdbcTypeCode(SqlTypes.JSON)` 사용 금지 (H2 테스트에서 history INSERT 실패). PostgreSQL JSONB 암묵적 캐스팅은 JDBC URL에 `stringtype=unspecified` 추가로 해결.
 
 2. **Authorization Code Grant** — `AuthController`가 `code + redirectUri`를 받아 `CognitoClient.exchangeCodeForToken()`으로 id_token 교환 후 검증. 기존 `cognitoToken` 직접 수신 방식에서 변경됨.
 
@@ -683,8 +683,11 @@ docker start aoc-postgres aoc-redis
 - OPERATOR는 본인 역할 변경 불가 (`ActorContext.userId == pathVariable id` 체크)
 - CSV export: `from~to` 범위 90일 초과 시 400 반환
 - SES 발신자: `ses.from-address` 설정값 사용 (로컬: `local@test.com`, prod: SES 인증된 이메일)
-- History JSONB 런타임 바인딩: `@Column(columnDefinition = "jsonb")`만으로 부족, `@JdbcTypeCode(SqlTypes.JSON)` 병행 필수 (DDL용 vs 런타임 바인딩용 역할 분리)
-- H2는 타입 검사 느슨 → 테스트 통과해도 PostgreSQL에서 JSONB 타입 에러 날 수 있음
+- History JSONB 매핑: `@Column(columnDefinition = "jsonb")`만 사용. `@JdbcTypeCode(SqlTypes.JSON)` 사용 금지 (H2 테스트 실패 원인)
+- PostgreSQL JSONB 암묵적 캐스팅: JDBC URL에 `stringtype=unspecified` 추가 필요 → PostgreSQL이 String을 JSONB로 자동 캐스팅
+  - DB_URL에 쿼리스트링 없으면: `jdbc:postgresql://host/db?stringtype=unspecified`
+  - DB_URL에 쿼리스트링 있으면: `&stringtype=unspecified` 로 추가
+- H2 테스트와 PostgreSQL 타입 불일치 주의: H2는 타입 검사 느슨 → 테스트 통과해도 PostgreSQL에서 에러날 수 있음
 - `CognitoClient.exchangeCodeForToken()`: Authorization Code → id_token 교환. code는 일회용이므로 재사용 불가
 - `application-local.yml`에 `cognito.domain` 추가 필요 (exchangeCodeForToken 사용)
 - `application-prod.yml`에 `cognito.domain: ${COGNITO_DOMAIN}` 추가 필요
