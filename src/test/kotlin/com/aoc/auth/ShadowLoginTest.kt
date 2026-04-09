@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(ShadowController::class)
-@Import(SecurityConfig::class)
+@Import(SecurityConfig::class, ActorContext::class)
 class ShadowLoginTest {
 
     @Autowired
@@ -90,6 +90,62 @@ class ShadowLoginTest {
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("PERMISSION_002"))
+    }
+
+    @Test
+    fun `운영자가 본인 계정에 쉐도우 발급 시 403을 반환한다`() {
+        mockOperatorToken(operatorId = "operator-id")
+        whenever(shadowService.startShadow(any(), any())).thenThrow(ShadowActionNotAllowedException())
+
+        mockMvc.perform(
+            post("/shadow-login")
+                .header("Authorization", "Bearer mock-operator-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(mapOf("targetMemberId" to "operator-id")))
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("PERMISSION_002"))
+    }
+
+    @Test
+    fun `쉐도우 JWT로 POST shadow-login 시도 시 403을 반환한다`() {
+        whenever(jwtProvider.validateToken(any())).thenThrow(RuntimeException("not an operator jwt"))
+        whenever(shadowJwtProvider.validateToken(any())).thenReturn(
+            ShadowClaims(
+                jti = "shadow-jti",
+                userId = "marketer-id",
+                role = Role.MARKETER,
+                operatorId = "operator-id",
+                targetName = "테스트마케터",
+                targetWorkEmail = null
+            )
+        )
+
+        mockMvc.perform(
+            post("/shadow-login")
+                .header("Authorization", "Bearer mock-shadow-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(mapOf("targetMemberId" to "some-id")))
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("PERMISSION_001"))
+    }
+
+    @Test
+    fun `OPERATOR가 아닌 토큰으로 POST shadow-login 시도 시 403을 반환한다`() {
+        whenever(jwtProvider.validateToken(any())).thenReturn(
+            JwtClaims(userId = "marketer-id", role = Role.MARKETER, isShadow = false, jti = "jti-mk")
+        )
+
+        mockMvc.perform(
+            post("/shadow-login")
+                .header("Authorization", "Bearer mock-marketer-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(mapOf("targetMemberId" to "some-id")))
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("PERMISSION_001"))
     }
 
     @Test
