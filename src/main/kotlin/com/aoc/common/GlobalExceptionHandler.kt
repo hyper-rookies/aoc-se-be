@@ -2,6 +2,7 @@ package com.aoc.common
 
 import com.aoc.auth.CognitoJwtException
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -30,6 +31,13 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .badRequest()
             .body(ApiResponse(success = false, message = message, code = "VALID_001"))
+    }
+
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDeniedException(e: AccessDeniedException): ResponseEntity<ApiResponse<Nothing>> {
+        return ResponseEntity
+            .status(ErrorCode.ACCESS_DENIED.status)
+            .body(ApiResponse.error(ErrorCode.ACCESS_DENIED))
     }
 
     @ExceptionHandler(IllegalArgumentException::class)
