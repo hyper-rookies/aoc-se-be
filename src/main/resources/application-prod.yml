@@ -25,6 +25,7 @@ cognito:
   user-pool-id: ${COGNITO_USER_POOL_ID}
   client-id: ${COGNITO_CLIENT_ID}
   region: ${COGNITO_REGION}
+  domain: ${COGNITO_DOMAIN}
 
 cors:
   allowed-origins: ${ALLOWED_ORIGINS:https://d2aom86zopona0.cloudfront.net}

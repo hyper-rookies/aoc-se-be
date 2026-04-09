@@ -46,14 +46,16 @@ class AuthCallbackTest {
     @MockBean
     private lateinit var redisTemplate: RedisTemplate<String, String>
 
+    private val validRequest = mapOf("code" to "auth-code-123", "redirectUri" to "http://localhost:5173/callback")
+
     @Test
-    fun `유효하지 않은 Cognito 토큰은 401을 반환한다`() {
-        whenever(cognitoClient.validateToken(any())).thenThrow(CognitoJwtException("유효하지 않은 토큰"))
+    fun `exchangeCodeForToken 실패 시 401을 반환한다`() {
+        whenever(cognitoClient.exchangeCodeForToken(any(), any())).thenThrow(CognitoJwtException("코드 교환 실패"))
 
         mockMvc.perform(
             post("/auth/callback")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(mapOf("cognitoToken" to "invalid-token")))
+                .content(objectMapper.writeValueAsString(validRequest))
         )
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.success").value(false))
@@ -61,7 +63,22 @@ class AuthCallbackTest {
     }
 
     @Test
-    fun `유효한 Cognito 토큰은 200과 JWT를 반환한다`() {
+    fun `validateToken 실패 시 401을 반환한다`() {
+        whenever(cognitoClient.exchangeCodeForToken(any(), any())).thenReturn("id-token-value")
+        whenever(cognitoClient.validateToken(any())).thenThrow(CognitoJwtException("유효하지 않은 토큰"))
+
+        mockMvc.perform(
+            post("/auth/callback")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest))
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("AUTH_001"))
+    }
+
+    @Test
+    fun `유효한 code와 redirectUri로 200과 JWT를 반환한다`() {
         val fakeClaims = CognitoClaims(sub = "sub-123", email = "user@example.com", name = "테스트")
         val loginResult = LoginResult(
             accessToken = "access-token-value",
@@ -69,13 +86,14 @@ class AuthCallbackTest {
             isNewMember = false
         )
 
+        whenever(cognitoClient.exchangeCodeForToken(any(), any())).thenReturn("id-token-value")
         whenever(cognitoClient.validateToken(any())).thenReturn(fakeClaims)
         whenever(memberService.loginOrRegister(any())).thenReturn(loginResult)
 
         mockMvc.perform(
             post("/auth/callback")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(mapOf("cognitoToken" to "valid-token")))
+                .content(objectMapper.writeValueAsString(validRequest))
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))

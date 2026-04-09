@@ -18,8 +18,9 @@ shadow-jwt:
 
 cognito:
   user-pool-id: ${COGNITO_USER_POOL_ID}   # Parameter Store: /aoc/se/cognito/user-pool-id
-  client-id: ${COGNITO_CLIENT_ID}         # Parameter Store: /aoc/se/cognito/client-id (formerly /aoc/se/cognito/domain)
+  client-id: ${COGNITO_CLIENT_ID}         # Parameter Store: /aoc/se/cognito/client-id
   region: ${COGNITO_REGION}               # e.g. ap-northeast-2
+  domain: ${COGNITO_DOMAIN}               # e.g. aoc-se.auth.ap-northeast-2.amazoncognito.com  (Parameter Store: /aoc/se/cognito/domain)
 
 cors:
   allowed-origins: ${ALLOWED_ORIGINS:https://d2aom86zopona0.cloudfront.net}

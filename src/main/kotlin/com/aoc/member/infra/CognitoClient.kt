@@ -6,7 +6,12 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.SignedJWT
 import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
+import org.springframework.util.LinkedMultiValueMap
+import org.springframework.web.client.RestTemplate
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
@@ -21,8 +26,11 @@ data class CognitoClaims(
 class CognitoClient(
     @Value("\${cognito.user-pool-id}") private val userPoolId: String,
     @Value("\${cognito.region}") private val region: String,
-    @Value("\${cognito.client-id}") private val clientId: String
+    @Value("\${cognito.client-id}") private val clientId: String,
+    @Value("\${cognito.domain}") private val cognitoDomain: String
 ) {
+
+    private val restTemplate = RestTemplate()
 
     private val jwksUrl get() = "https://cognito-idp.$region.amazonaws.com/$userPoolId/.well-known/jwks.json"
     private val keyCache = ConcurrentHashMap<String, RSAKey>()
@@ -30,6 +38,32 @@ class CognitoClient(
     @PostConstruct
     fun loadJwks() {
         loadAndCacheKeys()
+    }
+
+    fun exchangeCodeForToken(code: String, redirectUri: String): String {
+        val tokenUrl = "https://$cognitoDomain/oauth2/token"
+
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+        }
+        val body = LinkedMultiValueMap<String, String>().apply {
+            add("grant_type", "authorization_code")
+            add("client_id", clientId)
+            add("code", code)
+            add("redirect_uri", redirectUri)
+        }
+
+        val response = try {
+            restTemplate.postForObject(tokenUrl, HttpEntity(body, headers), Map::class.java)
+                ?: throw CognitoJwtException("Cognito Token Endpoint 응답이 없습니다")
+        } catch (e: CognitoJwtException) {
+            throw e
+        } catch (e: Exception) {
+            throw CognitoJwtException("Cognito 토큰 교환 실패", e)
+        }
+
+        return response["id_token"] as? String
+            ?: throw CognitoJwtException("Cognito 응답에 id_token이 없습니다")
     }
 
     fun validateToken(token: String): CognitoClaims {

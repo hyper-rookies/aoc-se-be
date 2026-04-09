@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-data class CallbackRequest(val cognitoToken: String)
+data class CallbackRequest(val code: String, val redirectUri: String)
 
 @Tag(name = "Auth", description = "인증 API")
 @RestController
@@ -30,7 +30,8 @@ class AuthController(
     )
     @PostMapping("/callback")
     fun callback(@RequestBody request: CallbackRequest): ApiResponse<LoginResult> {
-        val claims = cognitoClient.validateToken(request.cognitoToken)
+        val idToken = cognitoClient.exchangeCodeForToken(request.code, request.redirectUri)
+        val claims = cognitoClient.validateToken(idToken)
         val result = memberService.loginOrRegister(claims)
         return ApiResponse.ok(result)
     }
