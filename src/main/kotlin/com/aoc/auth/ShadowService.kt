@@ -10,6 +10,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 data class ShadowLoginResult(val shadowToken: String)
 
@@ -51,6 +52,8 @@ class ShadowService(
         val shadowClaims = shadowJwtProvider.validateToken(shadowToken)
 
         redisTemplate.opsForValue().set("shadow:operator:$operatorId", shadowClaims.jti, Duration.ofMinutes(30))
+        redisTemplate.opsForSet().add("shadow:target:$targetMemberId", operatorId)
+        redisTemplate.expire("shadow:target:$targetMemberId", 30, TimeUnit.MINUTES)
 
         historyRepository.save(
             History(
@@ -71,6 +74,11 @@ class ShadowService(
     fun endShadow(shadowJti: String, operatorId: String, targetMemberId: String) {
         redisTemplate.opsForValue().set("blacklist:$shadowJti", "1", Duration.ofMinutes(30))
         redisTemplate.delete("shadow:operator:$operatorId")
+        redisTemplate.opsForSet().remove("shadow:target:$targetMemberId", operatorId)
+        val remaining = redisTemplate.opsForSet().size("shadow:target:$targetMemberId") ?: 0L
+        if (remaining == 0L) {
+            redisTemplate.delete("shadow:target:$targetMemberId")
+        }
 
         historyRepository.save(
             History(
@@ -83,5 +91,14 @@ class ShadowService(
                 isShadow = true
             )
         )
+    }
+
+    fun invalidateShadowByTarget(targetId: String) {
+        val key = "shadow:target:$targetId"
+        val operatorIds = redisTemplate.opsForSet().members(key) ?: return
+        operatorIds.forEach { operatorId ->
+            redisTemplate.delete("shadow:operator:$operatorId")
+        }
+        redisTemplate.delete(key)
     }
 }
