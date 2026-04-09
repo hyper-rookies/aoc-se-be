@@ -67,12 +67,16 @@ aoc-se-be/
 │   │   │   ├── Member.kt                   ✅ Role, MemberStatus enum 포함 / 🔧 Day 3 수정 (MemberStatus 6종 확장, deletedAt 추가)
 │   │   │   └── MemberRepository.kt         ✅
 │   │   ├── application/
-│   │   │   └── MemberService.kt            ✅ loginOrRegister() / 🔧 Day 3 수정 (상태 검증, 동시 로그인 처리)
+│   │   │   ├── MemberService.kt            ✅ loginOrRegister() / 🔧 Day 3 수정 (상태 검증, 동시 로그인 처리) / 🔧 Day 5 수정 (로그인 히스토리, 상태 변경)
+│   │   │   └── EmailVerificationService.kt ✅ Day 5 신규 (이메일 인증 코드 발송/확인, 30분 잠금)
 │   │   ├── presentation/
-│   │   │   ├── MemberController.kt         (미구현)
+│   │   │   ├── MemberController.kt         ✅ Day 5 신규 (GET/PUT/DELETE /members/me, PUT /members/{id}/role, GET /members)
 │   │   │   └── dto/
 │   │   └── infra/
-│   │       └── CognitoClient.kt            ✅ JWKS 기반 검증
+│   │       ├── CognitoClient.kt            ✅ JWKS 기반 검증
+│   │       ├── EmailSender.kt              ✅ Day 5 신규 (인터페이스)
+│   │       ├── LogEmailSender.kt           ✅ Day 5 신규 (로컬용 콘솔 출력)
+│   │       └── SesEmailSender.kt           ✅ Day 5 신규 (prod용 AWS SES 발송)
 │   ├── auth/
 │   │   ├── AuthController.kt               ✅ POST /auth/callback
 │   │   ├── JwtProvider.kt                  ✅ HS256, jti 포함
@@ -80,22 +84,28 @@ aoc-se-be/
 │   │   ├── ActorContext.kt                 ✅ ThreadLocal, shadowId 포함
 │   │   ├── CognitoJwtException.kt          ✅
 │   │   ├── ShadowJwtProvider.kt            ✅ Day 3 완료
-│   │   ├── ShadowService.kt                ✅ Day 3 완료
+│   │   ├── ShadowService.kt                ✅ Day 3 완료 / 🔧 Day 5 수정 (shadow:target 관리, invalidateShadowByTarget)
 │   │   └── ShadowController.kt             ✅ Day 3 완료 (POST/DELETE /shadow-login)
 │   ├── history/
 │   │   ├── History.kt                      ✅ Day 3 완료 (shadowId 포함) / Day 4에 EntityListener 연동
-│   │   ├── HistoryRepository.kt            ✅ Day 3 완료
+│   │   ├── HistoryAction.kt                ✅ Day 5 신규 (PERSIST/UPDATE/DELETE/LOGIN/SHADOW_LOGIN_START/SHADOW_LOGIN_END)
+│   │   ├── HistoryRepository.kt            ✅ Day 3 완료 / 🔧 Day 5 수정 (JpaSpecificationExecutor 추가)
+│   │   ├── HistoryController.kt            ✅ Day 5 신규 (GET /histories, GET /histories/export)
+│   │   ├── HistoryResponse.kt              ✅ Day 5 신규
 │   │   ├── HistoryEntityListener.kt        ✅ Day 4 완료
 │   │   └── HistoryEventHandler.kt          ✅ Day 4 완료
 │   ├── notification/
 │   │   ├── NotificationSetting.kt          ✅
-│   │   └── NotificationSettingRepository.kt ✅
+│   │   ├── NotificationSettingRepository.kt ✅
+│   │   ├── NotificationController.kt       ✅ Day 5 신규 (GET/PUT /notification-settings)
+│   │   ├── NotificationService.kt          ✅ Day 5 신규
+│   │   └── dto/                            ✅ Day 5 신규 (NotificationSettingResponse, UpdateNotificationRequest)
 │   ├── common/
 │   │   ├── BaseEntity.kt                   ✅ ULID, snapshot
 │   │   ├── ApiResponse.kt                  ✅ ok/error 팩토리, code 필드
-│   │   ├── ErrorCode.kt                    ✅ ErrorCode enum / 🔧 Day 3 수정 (MEMBER_STATUS 에러코드 추가)
+│   │   ├── ErrorCode.kt                    ✅ ErrorCode enum / 🔧 Day 3 수정 (MEMBER_STATUS 에러코드 추가) / 🔧 Day 5 수정 (EMAIL_005, HISTORY_001/002 추가)
 │   │   ├── BusinessException.kt            ✅ + 하위 예외 클래스 / 🔧 Day 3 수정 (MemberStatusException 추가)
-│   │   ├── GlobalExceptionHandler.kt       ✅ MethodArgumentNotValidException 포함
+│   │   ├── GlobalExceptionHandler.kt       ✅ MethodArgumentNotValidException 포함 / 🔧 Day 5 수정 (AccessDeniedException 핸들러 추가)
 │   │   └── SpringApplicationContext.kt     ✅ Day 4 완료
 │   └── config/
 │       ├── SecurityConfig.kt               ✅ STATELESS, CSRF off, JwtFilter 등록
@@ -107,7 +117,10 @@ aoc-se-be/
 │   ├── application.yml                     공통 설정 (profiles.active=local)
 │   ├── application-local.yml               로컬 개발용 (git 제외)
 │   ├── application-prod.yml                배포용 환경변수 참조 (git 포함 — ${ENV_VAR} 참조만)
-│   └── application-prod.yml.example        환경변수 키 목록 문서화 (git 포함)
+│   ├── application-prod.yml.example        환경변수 키 목록 문서화 (git 포함)
+│   └── db/migration/
+│       ├── V1__init_schema.sql             ✅ Day 5 신규 (최종 스키마 — Day 2 CREATE + Day 3 ALTER 통합)
+│       └── V2__history_action_no_constraint.sql  ✅ Day 5 신규 (history_action_check 제약 제거)
 ├── build.gradle.kts
 ├── Dockerfile
 ├── CLAUDE.md
@@ -155,6 +168,39 @@ ALTER TABLE history ADD COLUMN shadow_id VARCHAR(26);
    ```
 
 3. **JwtAuthenticationFilter 분기** — 토큰의 `isShadow` 클레임으로 `ShadowJwtProvider` / `JwtProvider` 분기. Shadow JWT는 동시 로그인 차단 체크(`session:{userId}`) skip.
+
+---
+
+### Day 5 — 나머지 API 구현 + Flyway + 설계 보완 ✅ 완료 (4/9)
+
+**신규 API**
+- `GET /members/me`, `PUT /members/me`, `DELETE /members/me`
+- `PUT /members/{id}/role`, `GET /members`
+- `POST /members/me/work-email/verify`, `POST /members/me/work-email/confirm`
+- `GET /notification-settings`, `PUT /notification-settings`
+- `GET /histories`, `GET /histories/export` (90일 범위 제한)
+
+**HistoryAction enum**
+- DB CHECK constraint 제거, enum이 단일 진실 공급원
+- `PERSIST / UPDATE / DELETE / LOGIN / SHADOW_LOGIN_START / SHADOW_LOGIN_END`
+
+**Shadow 무효화 정책 확정**
+- 트리거: 대상 계정 status 변경 OR role 변경
+- 구현: `shadow:target:{targetId}` Set에서 operatorId 목록 조회 → 각 `shadow:operator` 키 삭제
+- `ShadowService.invalidateShadowByTarget(targetId)` 메서드
+
+**이메일 인증 정책**
+- 재발송 시 시도 횟수 누적 (리셋 없음)
+- 5회 실패 시 `email-verify:{userId}:locked` (TTL 30분)
+- 잠금 중 발송/확인 시도 → `EMAIL_VERIFY_LOCKED` (HTTP 429)
+
+**토큰 안전성**
+- Redis 저장 실패 시 JWT 발급 롤백 → `SERVER_ERROR` 반환
+
+**Flyway 도입**
+- `baseline-on-migrate: true` (로컬 — 이미 테이블 존재)
+- `baseline-on-migrate: false` (prod — 최초 실행, V1부터 적용)
+- `ddl-auto: none` (flyway가 스키마 관리)
 
 ---
 
@@ -321,10 +367,14 @@ data class JwtClaims(
 
 Redis 키 구조:
 ```
-refresh:{userId}        → Refresh Token (TTL 4시간)
-blacklist:{jti}         → 블랙리스트 등록된 Access Token
-session:{userId}        → 현재 유효한 Access Token jti (동시 로그인 차단용)
+refresh:{userId}             → Refresh Token (TTL 4시간)
+blacklist:{jti}              → 블랙리스트 등록된 Access Token
+session:{userId}             → 현재 유효한 Access Token jti (동시 로그인 차단용)
 shadow:operator:{operatorId} → 운영자의 현재 활성 Shadow JWT jti (쉐도우 전환 시 이전 것 무효화)
+shadow:target:{targetId}     → Set<operatorId> (TTL 30분) — 해당 대상에 접속 중인 운영자 목록
+email-verify:{userId}        → 발송된 인증 코드 (TTL 5분)
+email-verify:{userId}:attempts → 시도 횟수 누적 카운터
+email-verify:{userId}:locked → 잠금 플래그 (TTL 30분, 5회 초과 시 설정)
 ```
 
 ---
@@ -618,3 +668,10 @@ docker start aoc-postgres aoc-redis
 - PENDING_DELETION → DELETED 배치 전환은 본 프로젝트 구현 대상 (과제 범위 밖)
 - History의 `before_value`, `after_value`는 `@Column(columnDefinition = "jsonb")` 필수
 - Shadow JWT 서명 키는 로컬 `application-local.yml`, prod는 Secrets Manager — `application-prod.yml.example`에 `shadow-jwt.secret: ${SHADOW_JWT_SECRET}` 추가 필요
+- DB 스키마 변경은 반드시 `db/migration/` 하위 `Vn__` 파일로 관리 (직접 ALTER 금지)
+- `HistoryAction`은 enum으로만 관리, DB CHECK constraint 없음 (V2로 제거 완료)
+- `shadow:target:{targetId}`는 Set 타입 (`opsForSet` 사용)
+- 이메일 인증 잠금: `email-verify:{userId}:locked` (TTL 30분), 5회 초과 시 설정
+- OPERATOR는 본인 역할 변경 불가 (`ActorContext.userId == pathVariable id` 체크)
+- CSV export: `from~to` 범위 90일 초과 시 400 반환
+- SES 발신자: `ses.from-address` 설정값 사용 (로컬: `local@test.com`, prod: SES 인증된 이메일)
