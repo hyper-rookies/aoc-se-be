@@ -30,8 +30,7 @@ class CorsConfig(
         config.allowCredentials = true
 
         val source = UrlBasedCorsConfigurationSource()
-        source.registerCorsConfiguration("/api/**", config)
-        source.registerCorsConfiguration("/auth/**", config)
+        source.registerCorsConfiguration("/**", config)
         return source
     }
 }
