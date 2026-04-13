@@ -6,6 +6,8 @@ import com.aoc.member.domain.Role
 import java.time.LocalDateTime
 
 data class MemberResponse(
+    val email: String,
+    val provider: String,
     val name: String,
     val workEmail: String?,
     val role: Role,
@@ -14,6 +16,8 @@ data class MemberResponse(
 ) {
     companion object {
         fun from(member: Member) = MemberResponse(
+            email = member.email,
+            provider = member.provider,
             name = member.name,
             workEmail = member.workEmail,
             role = member.role,
