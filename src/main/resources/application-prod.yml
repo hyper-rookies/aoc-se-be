@@ -5,7 +5,7 @@ spring:
   flyway:
     baseline-on-migrate: false
   datasource:
-    url: ${DB_URL}?stringtype=unspecified
+    url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
