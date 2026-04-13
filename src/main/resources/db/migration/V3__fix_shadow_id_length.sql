@@ -1,0 +1,1 @@
+ALTER TABLE history ALTER COLUMN shadow_id TYPE VARCHAR(36);

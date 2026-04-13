@@ -24,6 +24,7 @@ class History(
     var afterValue: String? = null,
     val actorId: String,
     val operatorId: String? = null,
+    @Column(name = "shadow_id", length = 36)
     var shadowId: String? = null,
     val isShadow: Boolean = false,
     val createdAt: LocalDateTime = LocalDateTime.now()
