@@ -4,6 +4,7 @@ import com.aoc.auth.CognitoJwtException
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -38,6 +39,11 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(ErrorCode.ACCESS_DENIED.status)
             .body(ApiResponse.error(ErrorCode.ACCESS_DENIED))
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleTypeMismatch(e: MethodArgumentTypeMismatchException): ResponseEntity<ApiResponse<Nothing>> {
+        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.INVALID_INPUT))
     }
 
     @ExceptionHandler(IllegalArgumentException::class)

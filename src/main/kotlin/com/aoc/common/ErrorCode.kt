@@ -39,6 +39,9 @@ enum class ErrorCode(
     EMAIL_VERIFY_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "EMAIL_004", "인증 시도 횟수를 초과했습니다."),
     EMAIL_VERIFY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "EMAIL_005", "인증 시도 횟수를 초과했습니다. 30분 후 다시 시도해주세요."),
 
+    // Common
+    INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "잘못된 요청값입니다."),
+
     // History
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "HISTORY_001", "시작일이 종료일보다 늦을 수 없습니다."),
     HISTORY_EXPORT_RANGE_EXCEEDED(HttpStatus.BAD_REQUEST, "HISTORY_002", "CSV 내보내기는 최대 90일 범위만 가능합니다."),
