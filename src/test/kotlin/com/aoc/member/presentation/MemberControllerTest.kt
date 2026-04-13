@@ -106,6 +106,8 @@ class MemberControllerTest {
     }
 
     private fun memberResponse(name: String = "테스트유저", role: Role = Role.MARKETER) = MemberResponse(
+        email = "test@example.com",
+        provider = "google",
         name = name,
         workEmail = null,
         role = role,
@@ -324,6 +326,7 @@ class MemberControllerTest {
     fun `OPERATOR가 GET members 시 200과 페이지 응답을 반환한다`() {
         mockOperatorToken()
         val member = MemberSummaryResponse(
+            id = "member-id-1",
             name = "마케터A",
             workEmail = null,
             role = Role.MARKETER,
