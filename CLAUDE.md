@@ -71,7 +71,7 @@ aoc-se-be/
 │   │   │   └── EmailVerificationService.kt ✅ Day 5 신규 (이메일 인증 코드 발송/확인, 30분 잠금)
 │   │   ├── presentation/
 │   │   │   ├── MemberController.kt         ✅ Day 5 신규 (GET/PUT/DELETE /members/me, PUT /members/{id}/role, GET /members)
-│   │   │   └── dto/
+│   │   │   └── dto/                        🔧 Day 7 수정 (MemberResponse에 id/email/provider 추가, MemberSummaryResponse에 id 추가)
 │   │   └── infra/
 │   │       ├── CognitoClient.kt            ✅ JWKS 기반 검증
 │   │       ├── EmailSender.kt              ✅ Day 5 신규 (인터페이스)
@@ -87,7 +87,7 @@ aoc-se-be/
 │   │   ├── ShadowService.kt                ✅ Day 3 완료 / 🔧 Day 5 수정 (shadow:target 관리, invalidateShadowByTarget)
 │   │   └── ShadowController.kt             ✅ Day 3 완료 (POST/DELETE /shadow-login)
 │   ├── history/
-│   │   ├── History.kt                      ✅ Day 3 완료 (shadowId 포함) / Day 4에 EntityListener 연동
+│   │   ├── History.kt                      ✅ Day 3 완료 (shadowId 포함) / Day 4에 EntityListener 연동 / 🔧 Day 7 수정 (shadowId length 36)
 │   │   ├── HistoryAction.kt                ✅ Day 5 신규 (PERSIST/UPDATE/DELETE/LOGIN/SHADOW_LOGIN_START/SHADOW_LOGIN_END)
 │   │   ├── HistoryRepository.kt            ✅ Day 3 완료 / 🔧 Day 5 수정 (JpaSpecificationExecutor 추가)
 │   │   ├── HistoryController.kt            ✅ Day 5 신규 (GET /histories, GET /histories/export)
@@ -105,11 +105,11 @@ aoc-se-be/
 │   │   ├── ApiResponse.kt                  ✅ ok/error 팩토리, code 필드
 │   │   ├── ErrorCode.kt                    ✅ ErrorCode enum / 🔧 Day 3 수정 (MEMBER_STATUS 에러코드 추가) / 🔧 Day 5 수정 (EMAIL_005, HISTORY_001/002 추가)
 │   │   ├── BusinessException.kt            ✅ + 하위 예외 클래스 / 🔧 Day 3 수정 (MemberStatusException 추가)
-│   │   ├── GlobalExceptionHandler.kt       ✅ MethodArgumentNotValidException 포함 / 🔧 Day 5 수정 (AccessDeniedException 핸들러 추가)
+│   │   ├── GlobalExceptionHandler.kt       ✅ MethodArgumentNotValidException 포함 / 🔧 Day 5 수정 (AccessDeniedException 핸들러 추가) / 🔧 Day 7 수정 (MethodArgumentTypeMismatchException → 400 추가)
 │   │   └── SpringApplicationContext.kt     ✅ Day 4 완료
 │   └── config/
 │       ├── SecurityConfig.kt               ✅ STATELESS, CSRF off, JwtFilter 등록
-│       ├── CorsConfig.kt                   ✅ 로컬 5173 + CloudFront
+│       ├── CorsConfig.kt                   ✅ 로컬 5173 + CloudFront / 🔧 Day 7 수정 (경로 /** 로 통일)
 │       ├── JpaConfig.kt                    ✅ @EnableJpaAuditing
 │       ├── RedisConfig.kt                  ✅ StringRedisSerializer
 │       └── SwaggerConfig.kt                ✅ bearerAuth 스킴 등록
@@ -120,7 +120,8 @@ aoc-se-be/
 │   ├── application-prod.yml.example        환경변수 키 목록 문서화 (git 포함)
 │   └── db/migration/
 │       ├── V1__init_schema.sql             ✅ Day 5 신규 (최종 스키마 — Day 2 CREATE + Day 3 ALTER 통합)
-│       └── V2__history_action_no_constraint.sql  ✅ Day 5 신규 (history_action_check 제약 제거)
+│       ├── V2__history_action_no_constraint.sql  ✅ Day 5 신규 (history_action_check 제약 제거)
+│       └── V3__shadow_id_varchar36.sql     ✅ Day 7 신규 (shadow_id VARCHAR(26) → VARCHAR(36))
 ├── build.gradle.kts
 ├── Dockerfile
 ├── CLAUDE.md
@@ -201,6 +202,18 @@ ALTER TABLE history ADD COLUMN shadow_id VARCHAR(26);
 - `baseline-on-migrate: true` (로컬 — 이미 테이블 존재)
 - `baseline-on-migrate: false` (prod — 최초 실행, V1부터 적용)
 - `ddl-auto: none` (flyway가 스키마 관리)
+
+---
+
+### Day 7 — 버그 수정 및 보완 ✅ 완료
+
+- `CorsConfig.kt` — CORS 경로를 `/**` 로 통일 (context-path `/api` 와 충돌 해결)
+- `application-prod.yml` — datasource url `${DB_URL}?stringtype=unspecified` → `${DB_URL}` 로 수정 (SSM 값에 이미 포함, 중복 파라미터 제거)
+- `MemberResponse` — `id`, `email`, `provider` 필드 추가
+- `MemberSummaryResponse` — `id` 필드 추가
+- `GlobalExceptionHandler.kt` — `MethodArgumentTypeMismatchException` 핸들러 추가 → 400 반환
+- `V3__shadow_id_varchar36.sql` — `shadow_id` 컬럼 `VARCHAR(26)` → `VARCHAR(36)` (UUID 형식 jti 수용)
+- `History.kt` — `shadowId` 컬럼 `length = 36` 으로 수정
 
 ---
 
@@ -590,6 +603,7 @@ ALTER TABLE member
     ADD COLUMN deleted_at TIMESTAMP;
 
 -- 3. history에 shadow_id 컬럼 추가 (감사추적용 Shadow JWT jti)
+--    ※ Day 7에 VARCHAR(36)으로 확장됨 (V3 마이그레이션)
 ALTER TABLE history
     ADD COLUMN shadow_id VARCHAR(26);
 ```
@@ -634,7 +648,7 @@ CREATE TABLE history (
     after_value  JSONB,
     actor_id     VARCHAR(26)  NOT NULL,
     operator_id  VARCHAR(26),
-    shadow_id    VARCHAR(26),               -- Shadow JWT jti (쉐도우 세션 감사추적용)
+    shadow_id    VARCHAR(36),               -- Shadow JWT jti (UUID 형식 36자, 쉐도우 세션 감사추적용)
     is_shadow    BOOLEAN      NOT NULL DEFAULT false,
     created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -691,3 +705,7 @@ docker start aoc-postgres aoc-redis
 - `CognitoClient.exchangeCodeForToken()`: Authorization Code → id_token 교환. code는 일회용이므로 재사용 불가
 - `application-local.yml`에 `cognito.domain` 추가 필요 (exchangeCodeForToken 사용)
 - `application-prod.yml`에 `cognito.domain: ${COGNITO_DOMAIN}` 추가 필요
+- `shadow_id` 컬럼은 Shadow JWT의 jti (UUID 형식, 36자) — `VARCHAR(36)` 필수 (V3 마이그레이션으로 적용)
+- `MemberResponse`에 `id`, `email`, `provider` 필드 필수 포함
+- CORS는 `/**` 단일 경로로 등록 (context-path `/api` 와 충돌 방지)
+- `application-prod.yml` datasource url은 `${DB_URL}` 만 — `stringtype=unspecified`는 SSM Parameter Store 값에 포함됨
